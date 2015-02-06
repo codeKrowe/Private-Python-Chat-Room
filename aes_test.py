@@ -20,7 +20,7 @@ testdec = b.dec_str(testenc)
 
 
 print "testing compression"
-b.compress_zip("test.py","test.zip")
+b.compress_zip("aes_test.py","test.zip")
 
 
 #b.decompress_zip("test.zip","/Users/jonathan/Desktop/new")
