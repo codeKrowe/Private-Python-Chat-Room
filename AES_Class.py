@@ -45,6 +45,7 @@ class AESClass:
 
 		self.keyHex = crypt.genRandomBytesENC(binBytes_key_size)
 		crypt.SetEncodedKey(self.keyHex,"hex")
+		self.setup = True
 
 	def enc_str(self, val):
 		global crypt
@@ -120,5 +121,19 @@ class AESClass:
 	        if (success != True):
 	        	print(entry.lastErrorText())
 	        	sys.exit()
+	
+	def get_key(self):
+		if self.setup == True:
+			return self.keyHex
 
+	def get_mode(self):
+		if self.setup == True:
+			return self.mode	
+				
+	def get_keylen(self):
+		if self.setup == True:
+			return self.keylen
 
+	def get_iv(self):
+		if self.setup == True:
+			return self.ivHex		

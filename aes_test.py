@@ -24,3 +24,6 @@ b.compress_zip("aes_test.py","test.zip")
 
 
 #b.decompress_zip("test.zip","/Users/jonathan/Desktop/new")
+
+print "Return Sym Key test"
+print b.get_key()
