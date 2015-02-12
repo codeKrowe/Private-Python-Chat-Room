@@ -133,6 +133,9 @@ class Host(asyncore.dispatcher):
         # and setup the AES object
         global aesObj
         if inital_setup == "0":
+            # iv is MD5 hash of session key
+            iv = crypt.hashStringENC(sessionkey)
+            aesObj.setIv(iv)
             aesObj.set_sessionkey(sessionkey)
             aesObj.setupAES()
 

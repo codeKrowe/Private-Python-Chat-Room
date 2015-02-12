@@ -99,6 +99,8 @@ a = AESClass("cbc",128,0,"hex")
 # would have to use a digital envelope of the like to achieve this properly
 if inital_setup == "0":
   a.set_sessionkey(sessionkey)
+  iv = crypt.hashStringENC(sessionkey)
+  a.setIv(iv)
 else:
   print "setting serverSessionKey"
   a.set_sessionkey(serverKey)
