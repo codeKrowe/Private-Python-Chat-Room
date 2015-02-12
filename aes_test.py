@@ -9,7 +9,6 @@ testenc = a.enc_str("Greetings and Salutations!!")
 print "Testing Decyption"
 testdec = a.dec_str(testenc)
 
-
 print "\n256"
 b = AESClass("cbc",256,0,"hex")
 b.setupAES()

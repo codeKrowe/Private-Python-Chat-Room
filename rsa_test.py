@@ -4,7 +4,7 @@ def main():
 
   # Create our rsa encryption class
   rsa = RSAClass()
-
+  
   # some plaintext we want to encrypt
   plainText = "Gonna encrypt the shit out of this string!"
 
