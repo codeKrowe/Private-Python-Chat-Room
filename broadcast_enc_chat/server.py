@@ -21,6 +21,8 @@ hashcrypt.put_EncodingMode("hex")
 hashcrypt.put_HashAlgorithm("md5")
 
 dhBob = chilkat.CkDh()
+
+
 success = dhBob.UnlockComponent("Anything for 30-day trial")
 if (success != True):
     print(dhBob.lastErrorText())
@@ -35,6 +37,7 @@ sharedKey = None
 sessionkey = None
 aesObj = AESClass("cbc",128,0,"hex")
 inital_setup = "0"
+
 
 class RemoteClient(asyncore.dispatcher):
     #Wraps a remote client socket
@@ -195,5 +198,5 @@ class Host(asyncore.dispatcher):
 if __name__ == '__main__':
     host = Host()
     print ("server address", host.getsockname())
-    print "starting"
+    print "started"
     asyncore.loop()
