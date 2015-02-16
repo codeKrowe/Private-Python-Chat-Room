@@ -53,8 +53,6 @@ class AESClass:
 	def enc_str(self, val):
 		global crypt
 		encStr = crypt.encryptStringENC(val)
-		print "encrypted"
-		print encStr
 		return encStr
 
 	def set_sessionkey(self,key):
@@ -68,8 +66,6 @@ class AESClass:
 			decStr = crypt.decryptStringENC(val)
 		except:
 			print "decrypt error"
-		print "decrypted"
-		print decStr
 		return decStr
 
 	def enc_file(self, orig, new):

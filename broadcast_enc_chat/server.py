@@ -44,6 +44,7 @@ class RemoteClient(asyncore.dispatcher):
     def __init__(self, host, socket, address):
         asyncore.dispatcher.__init__(self, socket)
         self.host = host
+        self.address = address
         #collections.deque()
         #list-like container with fast appends and pops on either end
         self.outbox = collections.deque()
@@ -65,6 +66,8 @@ class RemoteClient(asyncore.dispatcher):
             raise ValueError('Message too long')
         self.send(message)
 
+    def get_address(self):
+        return self.address
 
 class Host(asyncore.dispatcher):
     log = logging.getLogger('Host')
@@ -157,10 +160,6 @@ class Host(asyncore.dispatcher):
         return True
 
 
-
-
-
-
     def handle_accept(self):
         # accept on the Asyncore handler
         # getting the remote address
@@ -179,7 +178,7 @@ class Host(asyncore.dispatcher):
             self.remote_clients.append(RemoteClient(self, socket, addr))
 
     def handle_read(self):
-        self.log.info('Received message: %s', self.read())
+        self.read()
 
     def broadcast(self, message):
     	# broadcasts messages to all sockets that are connected
@@ -188,11 +187,31 @@ class Host(asyncore.dispatcher):
     	# can be done when messages will be "pickled" dictionaries
     	# can set the origin address as lookup + other data
     	# hashes + nounces and the like
-        self.log.info('Broadcasting message: %s', message)
-        enc_message = aesObj.enc_str(message)
-        print "Broadcasting encypted mess :", enc_message
+        #dec_message = aesObj.dec_str()
+        orginal_hash = message[-32:]
+        # remove the original serialized object from the concatentated
+        # hash
+        message = message[:-32]
+        #hash the extracted object
+        test_hash = hashcrypt.hashStringENC(message)
+        # de-serialize and extract data
+        dictObj = pickle.loads(message)
+        src_port = dictObj["src_port"] 
+        src_data = dictObj["data"] 
+        # Check the Integrity of recived data vrs the new hash of extraced obj
+        if test_hash == orginal_hash:
+            print "Integrity Verified"
+        else:
+            print "Integrity fail"
+        # test Decyption --- (not nessesary)
+        dec_message_test = aesObj.dec_str(src_data)
+        print "Test Decypt :", dec_message_test
+
+        print "Broadcasting encypted mess :", src_data , " from 127.0.0.1:", src_port
         for remote_client in self.remote_clients:
-            remote_client.say(enc_message)
+            # dont broadcast the message back to source socket
+            if not (remote_client.get_address()[1] == src_port):
+                remote_client.say(src_data)
 
 
 if __name__ == '__main__':

@@ -124,10 +124,32 @@ def recv():
 
 Thread(target=recv).start()
 
+
+md5_crypt = chilkat.CkCrypt2()
+
+#  Any string argument automatically begins the 30-day trial.
+success = md5_crypt.UnlockComponent("30-day trial")
+if (success != True):
+    print(md4_crypt.lastErrorText())
+    sys.exit()
+md5_crypt.put_EncodingMode("hex")
+#  Set the hash algorithm:
+md5_crypt.put_HashAlgorithm("md5")
+
+client_src_port = client.getsockname()[1]
 while True:
+    # take input from command terminal   -- change to GUI
     data = raw_input('> ')
     if not data: break
-    client.send(data)
+    data = a.enc_str(data)
+    dictobj = {'src_port' : client_src_port, 'data' : data}
+    pickdump = pickle.dumps(dictobj)
+    # print "size of pickle",sys.getsizeof(pickdump)
+
+    # concatente serialized message with hash
+    hashStr = md5_crypt.hashStringENC(pickdump)
+    finalmessage = pickdump + hashStr
+    client.send(finalmessage)
 
 
 
