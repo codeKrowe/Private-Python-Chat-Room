@@ -35,7 +35,7 @@ class AESClass:
 		if self.mode == "cbc":
 			#ivHex = binascii.b2a_hex(os.urandom(16))
 			# self.ivHex = crypt.genRandomBytesENC(16)
-			self.ivHex = "6JDLMMXKvbavsnpzwDhquA=="
+			#self.ivHex = "6JDLMMXKvbavsnpzwDhquA=="
 			crypt.SetEncodedIV(self.ivHex,"hex")
 
 		if (self.keylen == 256):
@@ -147,4 +147,8 @@ class AESClass:
 
 	def get_iv(self):
 		if self.setup == True:
-			return self.ivHex		
+			return self.ivHex	
+
+	def setIv(self, iv):
+		ivHex = iv
+		return True	
