@@ -8,6 +8,17 @@ import pickle
 from time import sleep
 MAX_MESSAGE_LENGTH = 1024
 from AES_Class import *
+from RSAClass import *
+
+rsa = RSAClass()
+
+privkey = chilkat.CkPrivateKey()
+privkey.LoadXmlFile("Serverprivatekey.xml")
+ServerPrivateKey = privkey.getXml()
+
+pubKey = chilkat.CkPublicKey()
+pubKey.LoadXmlFile("Serverpublickey.xml")
+ServerPublicKey = pubKey.getXml()
 
 
 hashcrypt = chilkat.CkCrypt2()
@@ -37,7 +48,7 @@ sharedKey = None
 sessionkey = None
 aesObj = AESClass("cbc",128,0,"hex")
 inital_setup = "0"
-
+CLIENT_ID_STORE ={}
 
 class RemoteClient(asyncore.dispatcher):
     #Wraps a remote client socket
@@ -58,10 +69,16 @@ class RemoteClient(asyncore.dispatcher):
         client_message = self.recv(MAX_MESSAGE_LENGTH)
         self.host.broadcast(client_message)
 
+
+     #Called when the asynchronous loop detects that a writable socket can be written. 
     def handle_write(self):
+        # if nothing in outbox return
         if not self.outbox:
             return
+        # POP a message from the outbox
         message = self.outbox.popleft()
+        # message lenght has be a certain size
+        # for the recieving sp
         if len(message) > MAX_MESSAGE_LENGTH:
             raise ValueError('Message too long')
         self.send(message)
@@ -69,8 +86,7 @@ class RemoteClient(asyncore.dispatcher):
     def get_address(self):
         return self.address
 
-class Host(asyncore.dispatcher):
-    log = logging.getLogger('Host')
+class Chatroom(asyncore.dispatcher):
     # asyncore dispatcher listening on localhost random socket
     def __init__(self, address=('localhost', 0)):
         asyncore.dispatcher.__init__(self)
@@ -85,7 +101,7 @@ class Host(asyncore.dispatcher):
     def handle_error(self):
         raise
 
-    def auth(self, client, address):
+    def auth(self, client, address, cpub):
         global dhBob
         global p
         global g
@@ -93,90 +109,115 @@ class Host(asyncore.dispatcher):
         global sharedKey
         global sessionkey
         global inital_setup
-
-        #send if the this setup has happened from a cleint already
-        client.send(inital_setup)
-
-        logging.info('Setup for client', address)
-
-
-        # serialise objects with dictionary and "pickle"
-        dictobj = {'p' : p, 'g' : g,"e" : eBob}
-        pickdump = pickle.dumps(dictobj)
-        print "size of pickle",sys.getsizeof(pickdump)
-        client.send(pickdump)
-
-
-
-        ## without this loop will get a resource unavail
-        # error crashing the server ---- wait till recieve
-        loop = True
-        while loop:
-            try:
-                eAlice = client.recv(297)
-                loop = False
-            except:
-            	"do nothing"
-        print "Finished waiting"
-
-        # using the information from Client
-        kBob = dhBob.findK(eAlice)  
-        sharedKey = kBob
-        print "Shared Secret information"
-        print(address, "shared secret (should be equal to Bob's)")
-        print sharedKey
-
-        # Use a hashing algorithm to generate 128 bit Session key
-        sessionkey = hashcrypt.hashStringENC(kBob)
-
-        print ""
-        print "-----------sessionkey-------------"
-        print sessionkey
-
-        # Use custom AES object 
-        # if the setup hasent happen already then
-        # use the current new session key
-        # and setup the AES object
         global aesObj
-        if inital_setup == "0":
-            # iv is MD5 hash of session key
-            iv = crypt.hashStringENC(sessionkey)
-            aesObj.setIv(iv)
-            aesObj.set_sessionkey(sessionkey)
-            aesObj.setupAES()
-
-        print "---------AES KEY------------------" 
-        temp = str(aesObj.get_key())
-        print temp
-        # if the this is a new cleint then send
-        # the Session key
-        # this is done with no encyption!!!!!!!!!!!!!!
-        # just for testing - broadcast chat room
+        global rsa
+        #send if  this setup has happened from a client already
+        #because session key is already generated then
+        client.send(inital_setup)
         if inital_setup == "1":
-            client.send(temp)
+            print 'Setup for client', address
+            print ">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>Sending Session Key"
+            client.send(aesObj.get_key())            
+        else:      
+            print 'Setup for client', address
+            # serialise objects with dictionary and "pickle"
+            dictobj = {'p' : p, 'g' : g,"e" : eBob}
+            pickdump = pickle.dumps(dictobj)
+            # print "size of pickle",sys.getsizeof(pickdump), len(str(pickdump))
+            client.send(pickdump)
+            ## without this loop will get a resource unavail
+            # error crashing the server ---- wait till recieve
+            loop = True
+            while loop:
+                try:
+                    eAlice = client.recv(260)
+                    loop = False
+                except:
+                	"do nothing"
+            print "Finished waiting"
 
-        # first time setup
-        inital_setup = "1"
+            # using the information from Client
+            kBob = dhBob.findK(eAlice)  
+            sharedKey = kBob
+            print "Shared Secret information"
+            print(address, "shared secret (should be equal to Bob's)")
+            print sharedKey
+
+            # Use a hashing algorithm to generate 128 bit Session key
+            sessionkey = hashcrypt.hashStringENC(kBob)
+
+            print ""
+            print "-----------sessionkey-------------"
+            print sessionkey
+
+            # Use custom AES object 
+            # if the setup hasent happen already then
+            # use the current new session key
+            # and setup the AES object
+
+            if inital_setup == "0":
+                # iv is MD5 hash of session key
+                iv = crypt.hashStringENC(sessionkey)
+                aesObj.setIv(iv)
+                aesObj.set_sessionkey(sessionkey)
+                aesObj.setupAES()
+
+            print "---------AES KEY------------------" 
+            print len(str(aesObj.get_key()))
+            # if the this is a new cleint then send
+            # the Session key
+            # this is done with no encyption!!!!!!!!!!!!!!
+            # just for testing - broadcast chat room
+
+
+            # first time setup
+            inital_setup = "1"
         return True
 
 
     def handle_accept(self):
+        global ServerPrivateKey
+        global rsa
+        global CLIENT_ID_STORE
         # accept on the Asyncore handler
         # getting the remote address
         # and assigning a socket
 
+        # read event handler on listening socket
         socket, addr = self.accept()
         if (socket == None):
             return # For the remote client.
-        self.log.info('Accepted client at %s', addr)
+        print 'Accepted client at %s', addr
+
+        sleep(0.1)
+        ID = socket.recv(1024)
+        client_ID = rsa.decrypt_text(ID, ServerPrivateKey)
+        orginal_hash = client_ID[-32:]
+        client_ID = client_ID[:-32]
+
+        print "***********************"
+        print "***********************"
+
+        dictObj = pickle.loads(client_ID)       
+        cnonce = dictObj["nonce"]
+        testhash  = hashcrypt.hashStringENC(str(cnonce))
+
+        if orginal_hash == testhash:
+            print "\nNONCE Integrity Validated\n"
+
+        cpub = dictObj["public_key"]
+        CLIENT_ID_STORE[addr] = cnonce
 
         # If setup protocol returns true 
         # add remote socket to room
         # at the moment return True Regardless
-        stat = self.auth(socket, addr)
+        stat = self.auth(socket, addr, cpub)
         if stat == True:
             self.remote_clients.append(RemoteClient(self, socket, addr))
 
+    #Handle Read
+    #Called when the asynchronous loop detects that a read 
+    #call on the channels socket will succeed.
     def handle_read(self):
         self.read()
 
@@ -188,34 +229,38 @@ class Host(asyncore.dispatcher):
     	# can set the origin address as lookup + other data
     	# hashes + nounces and the like
         #dec_message = aesObj.dec_str()
-        orginal_hash = message[-32:]
-        # remove the original serialized object from the concatentated
-        # hash
-        message = message[:-32]
-        #hash the extracted object
-        test_hash = hashcrypt.hashStringENC(message)
-        # de-serialize and extract data
-        dictObj = pickle.loads(message)
-        src_port = dictObj["src_port"] 
-        src_data = dictObj["data"] 
-        # Check the Integrity of recived data vrs the new hash of extraced obj
-        if test_hash == orginal_hash:
-            print "Integrity Verified"
-        else:
-            print "Integrity fail"
-        # test Decyption --- (not nessesary)
-        dec_message_test = aesObj.dec_str(src_data)
-        print "Test Decypt :", dec_message_test
+        try:
+            orginal_hash = message[-32:]
+            # remove the original serialized object from the concatentated
+            # hash
+            message = message[:-32]
+            #hash the extracted object
+            test_hash = hashcrypt.hashStringENC(message)
+            # de-serialize and extract data
+            dictObj = pickle.loads(message)
+            src_port = dictObj["src_port"] 
+            src_data = dictObj["data"] 
+            # Check the Integrity of recived data vrs the new hash of extraced obj
+            if test_hash == orginal_hash:
+                "Integrity Verified"
+            else:
+                print "Integrity fail"
+            # test Decyption --- (not nessesary)
+            dec_message_test = aesObj.dec_str(src_data)
+            print "Test Decypt :", dec_message_test
 
-        print "Broadcasting encypted mess :", src_data , " from 127.0.0.1:", src_port
-        for remote_client in self.remote_clients:
-            # dont broadcast the message back to source socket
-            if not (remote_client.get_address()[1] == src_port):
-                remote_client.say(src_data)
-
+            print "Broadcasting encypted mess :", src_data , " from 127.0.0.1:", src_port
+            for remote_client in self.remote_clients:
+                # dont broadcast the message back to source socket
+                if not (remote_client.get_address()[1] == src_port):
+                    remote_client.say(src_data)
+        except Exception, e:
+            print "er Broadcasting"
+            print str(e)  
 
 if __name__ == '__main__':
-    host = Host()
-    print ("server address", host.getsockname())
+    chatroom = Chatroom()
+    print ("server address", chatroom.getsockname())
     print "started"
+    # polls "channels" only stops only when all these have been closed
     asyncore.loop()
