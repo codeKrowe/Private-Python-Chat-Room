@@ -9,6 +9,7 @@ from time import sleep
 MAX_MESSAGE_LENGTH = 1024
 from AES_Class import *
 from RSAClass import *
+import random
 
 rsa = RSAClass()
 
@@ -116,10 +117,12 @@ class Chatroom(asyncore.dispatcher):
         client.send(inital_setup)
         if inital_setup == "1":
             print 'Setup for client', address
-            print ">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>Sending Session Key"
-            client.send(aesObj.get_key())            
+            print ">>>>>>>>>>>>>>>>>>>>>>>Sending Session Key>>>>>>>>>>>>>>>>>"
+            print ">>>>>>>>>>>>>>>>>>>>>>>Digital Envelope>>>>>>>>>>>>>>>>>>>>>\n"
+            sk = rsa.encrypt_text(aesObj.get_key(), cpub)
+            client.send(sk)            
         else:      
-            print 'Setup for client', address
+            print 'Setup for first client', address
             # serialise objects with dictionary and "pickle"
             dictobj = {'p' : p, 'g' : g,"e" : eBob}
             pickdump = pickle.dumps(dictobj)
@@ -147,9 +150,11 @@ class Chatroom(asyncore.dispatcher):
             sessionkey = hashcrypt.hashStringENC(kBob)
 
             print ""
-            print "-----------sessionkey-------------"
+            print "-----------Sessionkey---------------"
+            print "------------generated---------------"
             print sessionkey
 
+            print "-----------------------------------"
             # Use custom AES object 
             # if the setup hasent happen already then
             # use the current new session key
@@ -162,8 +167,6 @@ class Chatroom(asyncore.dispatcher):
                 aesObj.set_sessionkey(sessionkey)
                 aesObj.setupAES()
 
-            print "---------AES KEY------------------" 
-            print len(str(aesObj.get_key()))
             # if the this is a new cleint then send
             # the Session key
             # this is done with no encyption!!!!!!!!!!!!!!
@@ -207,6 +210,25 @@ class Chatroom(asyncore.dispatcher):
 
         cpub = dictObj["public_key"]
         CLIENT_ID_STORE[addr] = cnonce
+        random.seed()
+        snonce = random.randrange(10000000000000,99999999999999)
+
+
+        responce =  {"snonce":snonce, "cnonce": cnonce}
+        responce = pickle.dumps(responce)
+        h = hashcrypt.hashStringENC(str(responce))
+        responce = responce + h
+        responce = rsa.encrypt_text(responce, cpub)
+        socket.send(responce)
+
+
+
+
+        # Using a comnination of nested lists and a dictionary to store nonce data
+        client_id_list =[ [cpub, "cpub"], [cnonce, "cnonce"], [snonce, "snonce"], ]
+        CLIENT_ID_STORE[addr] = client_id_list
+
+
 
         # If setup protocol returns true 
         # add remote socket to room

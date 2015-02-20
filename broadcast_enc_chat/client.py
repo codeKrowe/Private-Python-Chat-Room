@@ -8,7 +8,7 @@ from time import sleep
 from AES_Class import *
 from RSAClass import *
 import random
-random.seed()
+
 
 if (len(sys.argv) < 2):
     print 'Usage: python client.py <port>\n'
@@ -61,29 +61,42 @@ a = AESClass("cbc",128,0,"hex")
 
 # source port of Client
 client_src_port = client.getsockname()[1]
+#random nonce
+random.seed()
 nonce = random.randrange(10000000000000,99999999999999)
-# print "nonce", nonce
 
-firstID = {'src_port' : client_src_port, 'nonce' : nonce, 'public_key': public_key}
+
+firstID = {'nonce' : nonce, 'public_key': public_key}
 pid = pickle.dumps(firstID)
-
-# print "***********************"
-# print pid
-# print "***********************"
-
 hashStr = md5_crypt.hashStringENC(str(nonce))
-
-# print "size of the hash" , len(hashStr), hashStr
 finalID = pid + hashStr
-
 encyptedpayload = rsa.encrypt_text(finalID, ServerPublicKey)
 client.send(encyptedpayload)
 
-# print "lenthgs of payload" , len(encyptedpayload), "encyptedpayload"
-# # print encyptedpayload
 
-# print "decrypt_text"
-# print rsa.decrypt_text(encyptedpayload, ServerPrivateKey)
+challange_Resp = client.recv(1024)
+challange_Resp = rsa.decrypt_text(challange_Resp,private_key)
+h = challange_Resp[-32:]
+challange_Resp = challange_Resp[:-32]
+h2 = md5_crypt.hashStringENC(challange_Resp)
+challange_Resp = pickle.loads(challange_Resp)
+
+
+
+nonce_1 = challange_Resp["cnonce"]
+if h == h2 and nonce == nonce_1:
+	print "\n$$$$$$$$$$$$$$$$$$$$$$$$$$$$"
+	print "Challange Integrity Verified"
+	print "$$$$$$$$$$$$$$$$$$$$$$$$$$$$\n"
+else:
+	print "Integrity Challange Failed - closing connection"
+	client.close()
+	sys.exit(0)
+
+snonce = challange_Resp["snonce"]
+
+
+
 # initial setup
 # temporary measure to see if 
 # a client has already been setup,
@@ -98,7 +111,8 @@ print "inital_setup has occured before = ", inital_setup
 serverKey = None
 if inital_setup == "1":
   print "attempt to recv server key"
-  serverKey = client.recv(32)
+  serverKey = client.recv(1024)
+  serverKey = rsa.decrypt_text(serverKey, private_key)
   print "serverSessionKey", serverKey
   print "setting serverSessionKey"
   a.set_sessionkey(serverKey)
@@ -186,7 +200,7 @@ while True:
 	    hashStr = md5_crypt.hashStringENC(pickdump)
 	    finalmessage = pickdump + hashStr
 	    if len(finalmessage) > 1024:
-	    	print "message to large"
+	    	print "message too large for recieve buffer"
 	    else:
 	    	client.send(finalmessage)
 	except:
