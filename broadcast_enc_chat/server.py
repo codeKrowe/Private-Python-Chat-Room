@@ -1,6 +1,5 @@
 import asyncore
 import collections
-import logging
 import socket
 import chilkat
 import struct 
@@ -102,7 +101,7 @@ class Chatroom(asyncore.dispatcher):
     def handle_error(self):
         raise
 
-    def auth(self, client, address, cpub):
+    def auth(self, client, address, cpub, snonce, cnonce):
         global dhBob
         global p
         global g
@@ -116,10 +115,15 @@ class Chatroom(asyncore.dispatcher):
         #because session key is already generated then
         client.send(inital_setup)
         if inital_setup == "1":
-            print 'Setup for client', address
+            print 'Setup for new client', address
             print ">>>>>>>>>>>>>>>>>>>>>>>Sending Session Key>>>>>>>>>>>>>>>>>"
             print ">>>>>>>>>>>>>>>>>>>>>>>Digital Envelope>>>>>>>>>>>>>>>>>>>>>\n"
-            sk = rsa.encrypt_text(aesObj.get_key(), cpub)
+            dictobj = {'aes_key':aesObj.get_key(),"snonce":snonce, "cnonce":cnonce}
+            pickledump = pickle.dumps(dictobj)
+            h = hashcrypt.hashStringENC(pickledump)
+            pickledump = pickledump + h
+            # sk = rsa.encrypt_with_private(pickledump, ServerPrivateKey)
+            sk = rsa.encrypt_text(pickledump, cpub)
             client.send(sk)            
         else:      
             print 'Setup for first client', address
@@ -189,8 +193,8 @@ class Chatroom(asyncore.dispatcher):
         # read event handler on listening socket
         socket, addr = self.accept()
         if (socket == None):
-            return # For the remote client.
-        print 'Accepted client at %s', addr
+            return
+        print 'Accepted client from port ', addr
 
         sleep(0.1)
         ID = socket.recv(1024)
@@ -201,7 +205,8 @@ class Chatroom(asyncore.dispatcher):
         print "***********************"
         print "***********************"
 
-        dictObj = pickle.loads(client_ID)       
+        dictObj = pickle.loads(client_ID)  
+        # clients nonce value    
         cnonce = dictObj["nonce"]
         testhash  = hashcrypt.hashStringENC(str(cnonce))
 
@@ -218,6 +223,7 @@ class Chatroom(asyncore.dispatcher):
         responce = pickle.dumps(responce)
         h = hashcrypt.hashStringENC(str(responce))
         responce = responce + h
+        responce = rsa.encrypt_with_private(responce, ServerPrivateKey)
         responce = rsa.encrypt_text(responce, cpub)
         socket.send(responce)
 
@@ -228,12 +234,15 @@ class Chatroom(asyncore.dispatcher):
         client_id_list =[ [cpub, "cpub"], [cnonce, "cnonce"], [snonce, "snonce"], ]
         CLIENT_ID_STORE[addr] = client_id_list
 
-
+        print "previous nonces"
+        client_detail_retrieval_example = CLIENT_ID_STORE[addr]
+        for detail in list(client_detail_retrieval_example):
+            print detail[0]
 
         # If setup protocol returns true 
         # add remote socket to room
         # at the moment return True Regardless
-        stat = self.auth(socket, addr, cpub)
+        stat = self.auth(socket, addr, cpub, snonce, cnonce)
         if stat == True:
             self.remote_clients.append(RemoteClient(self, socket, addr))
 

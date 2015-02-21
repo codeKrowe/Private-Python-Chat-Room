@@ -23,9 +23,6 @@ pubKey = chilkat.CkPublicKey()
 pubKey.LoadXmlFile("Serverpublickey.xml")
 ServerPublicKey = pubKey.getXml()
 
-privkey = chilkat.CkPrivateKey()
-privkey.LoadXmlFile("Serverprivatekey.xml")
-ServerPrivateKey = privkey.getXml()
 
 md5_crypt = chilkat.CkCrypt2()
 #  Any string argument automatically begins the 30-day trial.
@@ -52,20 +49,32 @@ if (success != True):
     sys.exit()
 
 
+# create a socket on the localhost and connect to PASSED port
 HOST = 'localhost'
 BUFSIZE = 1024
 ADDR = (HOST, PORT)
 client = socket(AF_INET, SOCK_STREAM)
 client.connect(ADDR)
+
+# setup an AES object with cipher block chaining, 128-bit key, padding size and format
 a = AESClass("cbc",128,0,"hex")
 
-# source port of Client
+# source port of Client for use in communications later
 client_src_port = client.getsockname()[1]
-#random nonce
+#random nonce generated for the cient
+# seeded (probally with system time) to ensure new nonce generation
+# well as much as pseudorandom can ensure
 random.seed()
 nonce = random.randrange(10000000000000,99999999999999)
 
 
+# generate an ID dictionary for the client, passing its 
+# public-key and nonce to the server 
+# serializing the object 
+# hashing it + concatenating the hash to ther serialized data
+# then encypting with the servers public to ensure the nonce
+# cannot be intercepted
+# send to server
 firstID = {'nonce' : nonce, 'public_key': public_key}
 pid = pickle.dumps(firstID)
 hashStr = md5_crypt.hashStringENC(str(nonce))
@@ -73,16 +82,25 @@ finalID = pid + hashStr
 encyptedpayload = rsa.encrypt_text(finalID, ServerPublicKey)
 client.send(encyptedpayload)
 
-
+# recieve the Responce from the server with orginal client nonce
+# and the servers nonce
 challange_Resp = client.recv(1024)
+# decypt with the clients public key
 challange_Resp = rsa.decrypt_text(challange_Resp,private_key)
+# decypt with the servers private - verifys - because nonces will be mangled
+# if there a different private RSA used - It is assumed server only has this key
+challange_Resp = rsa.decrypt_with_public(challange_Resp, ServerPublicKey)
+# remove the Hash of the orginal serialized object - 32 Characters from end of message
 h = challange_Resp[-32:]
+# remove the serialized object - to the last 32 characters of the data
 challange_Resp = challange_Resp[:-32]
+# rehash this object
 h2 = md5_crypt.hashStringENC(challange_Resp)
+# de-serialized the object back to a python dictionary
 challange_Resp = pickle.loads(challange_Resp)
 
 
-
+# extract the returned nonce-1, check if valid, close socket and exit if not
 nonce_1 = challange_Resp["cnonce"]
 if h == h2 and nonce == nonce_1:
 	print "\n$$$$$$$$$$$$$$$$$$$$$$$$$$$$"
@@ -93,29 +111,38 @@ else:
 	client.close()
 	sys.exit(0)
 
+# extract the server nonce
 snonce = challange_Resp["snonce"]
 
 
+#check to see if a "Master Client" has setup the CHatroom
+#if not then initate the Diffie-Hellman Key exchange with the server
+# if it has happened retieve the Session-key from the server
 
-# initial setup
-# temporary measure to see if 
-# a client has already been setup,
-# current code generates new keys still
-# but this hacky approah makes allows
-# poor sharing of server master Session key
-# Created with cleint no. (1)
-
-# have to have exact bytes sometimes (sync issues)
+# have to have exact bytes(sync issues) !!!!!!!!!!!!!!!!!!!!
 inital_setup = client.recv(1)
 print "inital_setup has occured before = ", inital_setup
 serverKey = None
 if inital_setup == "1":
-  print "attempt to recv server key"
-  serverKey = client.recv(1024)
-  serverKey = rsa.decrypt_text(serverKey, private_key)
-  print "serverSessionKey", serverKey
-  print "setting serverSessionKey"
-  a.set_sessionkey(serverKey)
+	print "attempt to recv server key"
+	serverKey = client.recv(1024)
+
+	serverKey = rsa.decrypt_text(serverKey, private_key)
+	# serverKey = rsa.decrypt_with_public(serverKey, ServerPublicKey)
+	h = serverKey[-32:]
+	serverKey = serverKey[:-32]
+	h2 = md5_crypt.hashStringENC(serverKey)
+	serverKey = pickle.loads(serverKey)
+
+	if h == h2 and serverKey["cnonce"] == nonce and serverKey["snonce"] == snonce:	
+		sk  = serverKey["aes_key"]
+		print "serverSessionKey", sk
+		print "setting serverSessionKey"
+		a.set_sessionkey(sk)
+	else:
+		print "Integrity Mismatch"
+		client.close()
+		sys.exit(0)
 
 
 

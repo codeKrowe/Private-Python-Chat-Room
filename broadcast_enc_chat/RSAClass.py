@@ -36,7 +36,7 @@ class RSAClass:
     self.publicKey = self.rsa.exportPublicKey()
     self.privateKey = self.rsa.exportPrivateKey()
 
-    print type(self.publicKey)
+    # print type(self.publicKey)
 
     return self.publicKey, self.privateKey
 
@@ -78,4 +78,40 @@ class RSAClass:
 
     return plainText
 
-    
+  def encrypt_with_private(self, plainText, privateKey):
+    """ Encrypt plainText with private key """
+
+    #  Start with a new RSA object to demonstrate that all we
+    #  need are the keys previously exported:
+    rsaEncryptor = chilkat.CkRsa()
+
+    #  Encrypted output is always binary.  In this case, we want
+    #  to encode the encrypted bytes in a printable string.
+    #  Our choices are "hex", "base64", "url", "quoted-printable".
+    rsaEncryptor.put_EncodingMode("hex")
+
+    #  We'll encrypt with the public key and decrypt with the private
+    #  key.  It's also possible to do the reverse.
+    rsaEncryptor.ImportPublicKey(privateKey)
+
+    usePrivateKey = True
+    cipherText = rsaEncryptor.encryptStringENC(plainText, usePrivateKey)
+    # print(cipherText)
+
+    return cipherText    
+
+  def decrypt_with_public(self, cipherText, publickey):
+    """ Decrypt cipherText with public key """
+
+    #  Now decrypt:
+    rsaDecryptor = chilkat.CkRsa()
+
+    rsaDecryptor.put_EncodingMode("hex")
+    rsaDecryptor.ImportPrivateKey(publickey)
+
+    usePrivateKey = False
+    plainText = rsaDecryptor.decryptStringENC(cipherText, usePrivateKey)
+
+    # print(plainText)
+
+    return plainText
