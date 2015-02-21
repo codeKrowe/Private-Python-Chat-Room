@@ -122,16 +122,32 @@ class Chatroom(asyncore.dispatcher):
             pickledump = pickle.dumps(dictobj)
             h = hashcrypt.hashStringENC(pickledump)
             pickledump = pickledump + h
-            # sk = rsa.encrypt_with_private(pickledump, ServerPrivateKey)
-            sk = rsa.encrypt_text(pickledump, cpub)
+            sk = rsa.encrypt_with_private(pickledump, ServerPrivateKey)
+            sk = rsa.encrypt_text(sk, cpub)
+            # print "size of SK", len(str(sk))
             client.send(sk)            
         else:      
             print 'Setup for first client', address
             # serialise objects with dictionary and "pickle"
-            dictobj = {'p' : p, 'g' : g,"e" : eBob}
+            dictobj = {'p' : p, 'g' : g,"e" : eBob, "snonce":snonce, "cnonce":cnonce}
             pickdump = pickle.dumps(dictobj)
-            # print "size of pickle",sys.getsizeof(pickdump), len(str(pickdump))
-            client.send(pickdump)
+            pickdump = rsa.encrypt_with_private(pickdump, ServerPrivateKey)
+
+            print "unency pk1"
+            print pickdump[-768:]
+
+            pk1 = rsa.encrypt_text(pickdump[-768:], cpub)
+            pk2 = rsa.encrypt_text(pickdump[:-768], cpub)
+
+            print "--------------PK1 -------------"
+            print "len", len(pk1)
+            print "---------------PK2"
+            print "len", len(pk2)
+
+            # print "size of pickle",len(str(pickdump))
+            # client.send(pickdump)
+            client.send(pk1)
+            client.send(pk2)
             ## without this loop will get a resource unavail
             # error crashing the server ---- wait till recieve
             loop = True
