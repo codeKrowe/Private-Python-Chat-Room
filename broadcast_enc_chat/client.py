@@ -159,11 +159,23 @@ else:
 		defragment = pk2 + pk1
 
 		defragment = rsa.decrypt_with_public(defragment, ServerPublicKey)
+
+		h = defragment[-32:]
+		defragment = defragment[:-32]
+		h2 = md5_crypt.hashStringENC(defragment)
 		dictObj = pickle.loads(defragment)
-		p = dictObj["p"]
-		g = dictObj["g"]
-		g = int(g)
-		eBob = dictObj["e"]
+
+
+		if h == h2 and dictObj["cnonce"] == nonce and dictObj["snonce"] == snonce:	
+			p = dictObj["p"]
+			g = dictObj["g"]
+			g = int(g)
+			eBob = dictObj["e"]			
+		else:
+			print "Integrity Mismatch"
+			client.close()
+			sys.exit(0)
+
 	except:
 		print "fails to recieve Diffie-hellman data"
 		sys.exit(0)
@@ -173,9 +185,11 @@ else:
 	if (success != True):
 	    print("P is not a safe prime")
 	    sys.exit()
-	eAlice = dhAlice.createE(256)
 
-	# print "size of eAlice", len(str(eAlice))
+
+	eAlice = dhAlice.createE(256)
+	eAlice = rsa.encrypt_text(eAlice, ServerPublicKey)
+	print "size of eAlice", len(str(eAlice))
 	client.send(eAlice)
 
 	#Alice's shared secret 
