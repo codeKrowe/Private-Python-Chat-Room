@@ -5,7 +5,7 @@ import chilkat
 import struct 
 import pickle
 from time import sleep
-MAX_MESSAGE_LENGTH = 1024
+MAX = 1024
 from AES_Class import *
 from RSAClass import *
 import random
@@ -49,6 +49,7 @@ sessionkey = None
 aesObj = AESClass("cbc",128,0,"hex")
 inital_setup = "0"
 CLIENT_ID_STORE ={}
+CLIENT_ID = []
 
 class RemoteClient(asyncore.dispatcher):
     #Wraps a remote client socket
@@ -66,7 +67,7 @@ class RemoteClient(asyncore.dispatcher):
 
     def handle_read(self):
     	# read messages
-        client_message = self.recv(MAX_MESSAGE_LENGTH)
+        client_message = self.recv(MAX)
         self.host.broadcast(client_message)
 
 
@@ -79,7 +80,7 @@ class RemoteClient(asyncore.dispatcher):
         message = self.outbox.popleft()
         # message lenght has be a certain size
         # for the recieving sp
-        if len(message) > MAX_MESSAGE_LENGTH:
+        if len(message) > MAX:
             raise ValueError('Message too long')
         self.send(message)
 
@@ -87,19 +88,17 @@ class RemoteClient(asyncore.dispatcher):
         return self.address
 
 class Chatroom(asyncore.dispatcher):
-    # asyncore dispatcher listening on localhost random socket
+        #asyncore dispatcher listening on localhost random socket
     def __init__(self, address=('localhost', 0)):
         asyncore.dispatcher.__init__(self)
         #bind to socket and listen 
         self.create_socket(socket.AF_INET, socket.SOCK_STREAM)
         self.bind(address)
         #print ("Address Server", address)
+        # accept with no backlog
         self.listen(1)
-        #store connected clients in array
+        #store connected clients in LIST
         self.remote_clients = []
-
-    def handle_error(self):
-        raise
 
     def auth(self, client, address, cpub, snonce, cnonce):
         global dhBob
@@ -111,6 +110,7 @@ class Chatroom(asyncore.dispatcher):
         global inital_setup
         global aesObj
         global rsa
+        global CLIENT_ID
         #send if  this setup has happened from a client already
         #because session key is already generated then
         client.send(inital_setup)
@@ -122,26 +122,38 @@ class Chatroom(asyncore.dispatcher):
             pickledump = pickle.dumps(dictobj)
             h = hashcrypt.hashStringENC(pickledump)
             pickledump = pickledump + h
-            # sk = rsa.encrypt_with_private(pickledump, ServerPrivateKey)
-            sk = rsa.encrypt_text(pickledump, cpub)
+            sk = rsa.encrypt_with_private(pickledump, ServerPrivateKey)
+            sk = rsa.encrypt_text(sk, cpub)
+            # print "size of SK", len(str(sk))
             client.send(sk)            
         else:      
             print 'Setup for first client', address
             # serialise objects with dictionary and "pickle"
-            dictobj = {'p' : p, 'g' : g,"e" : eBob}
+            dictobj = {'p' : p, 'g' : g,"e" : eBob, "snonce":snonce, "cnonce":cnonce}
             pickdump = pickle.dumps(dictobj)
-            # print "size of pickle",sys.getsizeof(pickdump), len(str(pickdump))
-            client.send(pickdump)
+            h = hashcrypt.hashStringENC(pickdump)
+            pickdump = pickdump + h
+            pickdump = rsa.encrypt_with_private(pickdump, ServerPrivateKey)
+            print pickdump[-768:]
+
+            pk1 = rsa.encrypt_text(pickdump[-768:], cpub)
+            pk2 = rsa.encrypt_text(pickdump[:-768], cpub)
+            client.send(pk1)
+            client.send(pk2)
+
             ## without this loop will get a resource unavail
             # error crashing the server ---- wait till recieve
             loop = True
             while loop:
                 try:
-                    eAlice = client.recv(260)
+                    eAlice = client.recv(768)
+                    try:
+                        eAlice = rsa.decrypt_text(eAlice, ServerPrivateKey)
+                    except:
+                        "nothinf"
                     loop = False
                 except:
                 	"do nothing"
-            print "Finished waiting"
 
             # using the information from Client
             kBob = dhBob.findK(eAlice)  
@@ -181,7 +193,7 @@ class Chatroom(asyncore.dispatcher):
             inital_setup = "1"
         return True
 
-
+    # socket accept event handler of anyncore dispatcher
     def handle_accept(self):
         global ServerPrivateKey
         global rsa
@@ -228,17 +240,16 @@ class Chatroom(asyncore.dispatcher):
         socket.send(responce)
 
 
+        if inital_setup == "1":
+            print "previous nonces"
+            for c in list(CLIENT_ID):
+                print c[1]
+                if c[1] == cnonce and snonce == c[2]:
+                    print "AUTH already occured for ", c[0]
 
 
-        # Using a comnination of nested lists and a dictionary to store nonce data
-        client_id_list =[ [cpub, "cpub"], [cnonce, "cnonce"], [snonce, "snonce"], ]
-        CLIENT_ID_STORE[addr] = client_id_list
-
-        print "previous nonces"
-        client_detail_retrieval_example = CLIENT_ID_STORE[addr]
-        for detail in list(client_detail_retrieval_example):
-            print detail[0]
-
+        client_id_list =[ (cpub), (cnonce), (snonce)]
+        CLIENT_ID.append(client_id_list)
         # If setup protocol returns true 
         # add remote socket to room
         # at the moment return True Regardless

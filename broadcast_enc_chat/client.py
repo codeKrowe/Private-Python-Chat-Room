@@ -125,10 +125,9 @@ print "inital_setup has occured before = ", inital_setup
 serverKey = None
 if inital_setup == "1":
 	print "attempt to recv server key"
-	serverKey = client.recv(1024)
-
+	serverKey = client.recv(1280)
 	serverKey = rsa.decrypt_text(serverKey, private_key)
-	# serverKey = rsa.decrypt_with_public(serverKey, ServerPublicKey)
+	serverKey = rsa.decrypt_with_public(serverKey, ServerPublicKey)
 	h = serverKey[-32:]
 	serverKey = serverKey[:-32]
 	h2 = md5_crypt.hashStringENC(serverKey)
@@ -151,12 +150,32 @@ if inital_setup == "1":
 # Python dictionary then remove the objects
 else:
 	try:
-		pickobject = client.recv(570)
-		dictObj = pickle.loads(pickobject)
-		p = dictObj["p"]
-		g = dictObj["g"]
-		g = int(g)
-		eBob = dictObj["e"]
+		pk1 = client.recv(1792)
+		pk2 = client.recv(1792)
+
+		pk1 = rsa.decrypt_text(pk1, private_key)
+		pk2 = rsa.decrypt_text(pk2, private_key)
+
+		defragment = pk2 + pk1
+
+		defragment = rsa.decrypt_with_public(defragment, ServerPublicKey)
+
+		h = defragment[-32:]
+		defragment = defragment[:-32]
+		h2 = md5_crypt.hashStringENC(defragment)
+		dictObj = pickle.loads(defragment)
+
+
+		if h == h2 and dictObj["cnonce"] == nonce and dictObj["snonce"] == snonce:	
+			p = dictObj["p"]
+			g = dictObj["g"]
+			g = int(g)
+			eBob = dictObj["e"]			
+		else:
+			print "Integrity Mismatch"
+			client.close()
+			sys.exit(0)
+
 	except:
 		print "fails to recieve Diffie-hellman data"
 		sys.exit(0)
@@ -166,9 +185,11 @@ else:
 	if (success != True):
 	    print("P is not a safe prime")
 	    sys.exit()
-	eAlice = dhAlice.createE(256)
 
-	# print "size of eAlice", len(str(eAlice))
+
+	eAlice = dhAlice.createE(256)
+	eAlice = rsa.encrypt_text(eAlice, ServerPublicKey)
+	print "size of eAlice", len(str(eAlice))
 	client.send(eAlice)
 
 	#Alice's shared secret 
