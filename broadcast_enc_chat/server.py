@@ -49,6 +49,7 @@ sessionkey = None
 aesObj = AESClass("cbc",128,0,"hex")
 inital_setup = "0"
 CLIENT_ID_STORE ={}
+CLIENT_ID = []
 
 class RemoteClient(asyncore.dispatcher):
     #Wraps a remote client socket
@@ -109,6 +110,7 @@ class Chatroom(asyncore.dispatcher):
         global inital_setup
         global aesObj
         global rsa
+        global CLIENT_ID
         #send if  this setup has happened from a client already
         #because session key is already generated then
         client.send(inital_setup)
@@ -238,15 +240,16 @@ class Chatroom(asyncore.dispatcher):
         socket.send(responce)
 
 
-        # Using a comnination of nested lists and a dictionary to store nonce data
-        client_id_list =[ [cpub], [cnonce], [snonce], ]
-        CLIENT_ID_STORE[addr] = client_id_list
+        if inital_setup == "1":
+            print "previous nonces"
+            for c in list(CLIENT_ID):
+                print c[1]
+                if c[1] == cnonce and snonce == c[2]:
+                    print "AUTH already occured for ", c[0]
 
-        print "previous nonces"
-        client_detail_retrieval_example = CLIENT_ID_STORE[addr]
-        for detail in list(client_detail_retrieval_example):
-            print detail[0]
 
+        client_id_list =[ (cpub), (cnonce), (snonce)]
+        CLIENT_ID.append(client_id_list)
         # If setup protocol returns true 
         # add remote socket to room
         # at the moment return True Regardless
