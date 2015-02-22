@@ -15,7 +15,7 @@ from RSAClass import *
 import random
 import time
 from client import Client
-
+import traceback
 
 
 # Method to return current system time
@@ -53,18 +53,24 @@ class ChatRoomFrame(wx.Frame):
             # Display the text just entered by client.
             self.text.SetValue(t()+ data)
             self.ctrl.SetValue("")
-            data = self.a.enc_str(data)
-            dictobj = {'src_port' : self.client_src_port, 'data' : data}
+            print "test1"
+            print data
+
+            data = self.client.a.enc_str(str(data))
+            print "here test2"
+            dictobj = {'src_port' : self.client.client_src_port, 'data' : data}
             pickdump = pickle.dumps(dictobj)
             # concatente serialized message with hash
-            hashStr = self.md5_crypt.hashStringENC(pickdump)
+            hashStr = self.client.md5_crypt.hashStringENC(pickdump)
             finalmessage = pickdump + hashStr
             if len(finalmessage) > 1024:
                 print "message too large for recieve buffer"
             else:
-                self.client.send(finalmessage)
-        except:
+                self.client.client.send(finalmessage)
+        except Exception, err:
             print "send error"
+            print traceback.format_exc()
+            print sys.exc_info()[0]
 
 
 class DirectConnection(wx.Frame):
