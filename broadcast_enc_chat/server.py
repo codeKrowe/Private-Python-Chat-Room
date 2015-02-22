@@ -2,7 +2,7 @@ import asyncore
 import collections
 import socket
 import chilkat
-import struct 
+import struct
 import pickle
 from time import sleep
 MAX = 1024
@@ -27,7 +27,7 @@ if (success != True):
     print(hashcrypt.lastErrorText())
     sys.exit()
 
-# setting encoding mode for hashing algorithm 
+# setting encoding mode for hashing algorithm
 hashcrypt.put_EncodingMode("hex")
 hashcrypt.put_HashAlgorithm("md5")
 
@@ -71,7 +71,7 @@ class RemoteClient(asyncore.dispatcher):
         self.host.broadcast(client_message)
 
 
-     #Called when the asynchronous loop detects that a writable socket can be written. 
+     #Called when the asynchronous loop detects that a writable socket can be written.
     def handle_write(self):
         # if nothing in outbox return
         if not self.outbox:
@@ -91,7 +91,7 @@ class Chatroom(asyncore.dispatcher):
         #asyncore dispatcher listening on localhost random socket
     def __init__(self, address=('localhost', 0)):
         asyncore.dispatcher.__init__(self)
-        #bind to socket and listen 
+        #bind to socket and listen
         self.create_socket(socket.AF_INET, socket.SOCK_STREAM)
         self.bind(address)
         #print ("Address Server", address)
@@ -125,8 +125,8 @@ class Chatroom(asyncore.dispatcher):
             sk = rsa.encrypt_with_private(pickledump, ServerPrivateKey)
             sk = rsa.encrypt_text(sk, cpub)
             # print "size of SK", len(str(sk))
-            client.send(sk)            
-        else:      
+            client.send(sk)
+        else:
             print 'Setup for first client', address
             # serialise objects with dictionary and "pickle"
             dictobj = {'p' : p, 'g' : g,"e" : eBob, "snonce":snonce, "cnonce":cnonce}
@@ -156,7 +156,7 @@ class Chatroom(asyncore.dispatcher):
                 	"do nothing"
 
             # using the information from Client
-            kBob = dhBob.findK(eAlice)  
+            kBob = dhBob.findK(eAlice)
             sharedKey = kBob
             print "Shared Secret information"
             print(address, "shared secret (should be equal to Bob's)")
@@ -171,14 +171,14 @@ class Chatroom(asyncore.dispatcher):
             print sessionkey
 
             print "-----------------------------------"
-            # Use custom AES object 
+            # Use custom AES object
             # if the setup hasent happen already then
             # use the current new session key
             # and setup the AES object
 
             if inital_setup == "0":
                 # iv is MD5 hash of session key
-                iv = crypt.hashStringENC(sessionkey)
+                iv = aesObj.getCrypt().hashStringENC(sessionkey)
                 aesObj.setIv(iv)
                 aesObj.set_sessionkey(sessionkey)
                 aesObj.setupAES()
@@ -217,8 +217,8 @@ class Chatroom(asyncore.dispatcher):
         print "***********************"
         print "***********************"
 
-        dictObj = pickle.loads(client_ID)  
-        # clients nonce value    
+        dictObj = pickle.loads(client_ID)
+        # clients nonce value
         cnonce = dictObj["nonce"]
         testhash  = hashcrypt.hashStringENC(str(cnonce))
 
@@ -250,7 +250,7 @@ class Chatroom(asyncore.dispatcher):
 
         client_id_list =[ (cpub), (cnonce), (snonce)]
         CLIENT_ID.append(client_id_list)
-        # If setup protocol returns true 
+        # If setup protocol returns true
         # add remote socket to room
         # at the moment return True Regardless
         stat = self.auth(socket, addr, cpub, snonce, cnonce)
@@ -258,7 +258,7 @@ class Chatroom(asyncore.dispatcher):
             self.remote_clients.append(RemoteClient(self, socket, addr))
 
     #Handle Read
-    #Called when the asynchronous loop detects that a read 
+    #Called when the asynchronous loop detects that a read
     #call on the channels socket will succeed.
     def handle_read(self):
         self.read()
@@ -280,8 +280,8 @@ class Chatroom(asyncore.dispatcher):
             test_hash = hashcrypt.hashStringENC(message)
             # de-serialize and extract data
             dictObj = pickle.loads(message)
-            src_port = dictObj["src_port"] 
-            src_data = dictObj["data"] 
+            src_port = dictObj["src_port"]
+            src_data = dictObj["data"]
             # Check the Integrity of recived data vrs the new hash of extraced obj
             if test_hash == orginal_hash:
                 "Integrity Verified"
@@ -298,7 +298,7 @@ class Chatroom(asyncore.dispatcher):
                     remote_client.say(src_data)
         except Exception, e:
             print "er Broadcasting"
-            print str(e)  
+            print str(e)
 
 if __name__ == '__main__':
     chatroom = Chatroom()

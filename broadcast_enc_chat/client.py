@@ -11,7 +11,7 @@ import random
 
 # Hard Coded port for testing
 # MUST BE CHANGED TO WHATEVER PORT SERVER SETS
-PORT = 49648
+PORT = 49987
 HOST = 'localhost'
 BUFSIZE = 1024
 ADDR = (HOST, PORT)
@@ -157,21 +157,27 @@ class Client:
         # Python dictionary then remove the objects
         else:
             try:
-                pk1 = client.recv(1792)
-                pk2 = client.recv(1792)
-
-                pk1 = self.rsa.decrypt_text(pk1, private_key)
-                pk2 = self.rsa.decrypt_text(pk2, private_key)
-
+                print "11111111"
+                pk1 = self.client.recv(1792)
+                print "2222222"
+                pk2 = self.client.recv(1792)
+                print "333333"
+                pk1 = self.rsa.decrypt_text(pk1, self.private_key)
+                print "4444444"
+                pk2 = self.rsa.decrypt_text(pk2, self.private_key)
+                print "55555555"
                 defragment = pk2 + pk1
-
+                print "6666666"
                 defragment = self.rsa.decrypt_with_public(defragment, self.ServerPublicKey)
-
+                print "7777777"
                 h = defragment[-32:]
+                print "8888888"
                 defragment = defragment[:-32]
+                print "999999999"
                 h2 = self.md5_crypt.hashStringENC(defragment)
+                print "12341234"
                 dictObj = pickle.loads(defragment)
-
+                print "098y807t"
 
                 if h == h2 and dictObj["cnonce"] == nonce and dictObj["snonce"] == snonce:
                     p = dictObj["p"]
@@ -206,10 +212,9 @@ class Client:
 
             sessionkey = self.hashcrypt.hashStringENC(kAlice)
             print "SessionKey", sessionkey
-            a.set_sessionkey(sessionkey)
-            iv = self.crypt.hashStringENC(sessionkey)
+            self.a.set_sessionkey(sessionkey)
+            iv = self.a.getCrypt().hashStringENC(sessionkey)
             self.a.setIv(iv)
-
 
         # print "serverKey testing"
         # print type(serverKey)
