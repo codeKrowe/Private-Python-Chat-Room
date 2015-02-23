@@ -59,11 +59,11 @@ class RemoteClient(asyncore.dispatcher):
         self.address = address
         #collections.deque()
         #list-like container with fast appends and pops on either end
-        self.outbox = collections.deque()
+        self.outQ = collections.deque()
 
-    def say(self, message):
+    def tx(self, message):
         # appending message to the message queue
-        self.outbox.append(message)
+        self.outQ.append(message)
 
     def handle_read(self):
     	# read messages
@@ -73,11 +73,11 @@ class RemoteClient(asyncore.dispatcher):
 
      #Called when the asynchronous loop detects that a writable socket can be written.
     def handle_write(self):
-        # if nothing in outbox return
-        if not self.outbox:
+        # if nothing in outQ return
+        if not self.outQ:
             return
         # POP a message from the outbox
-        message = self.outbox.popleft()
+        message = self.outQ.popleft()
         # message lenght has be a certain size
         # for the recieving sp
         if len(message) > MAX:
@@ -86,6 +86,14 @@ class RemoteClient(asyncore.dispatcher):
 
     def get_address(self):
         return self.address
+
+
+    # this fixes the CPU 100% utilisation problem
+    # caused by the ayncore polling for avalable data to transfer
+    # returning always true (as will be the case when this is not overridden)
+    # will cause 100% Cpu
+    def writable(self):
+        return bool(self.outQ)        
 
 class Chatroom(asyncore.dispatcher):
         #asyncore dispatcher listening on localhost random socket
@@ -295,7 +303,7 @@ class Chatroom(asyncore.dispatcher):
             for remote_client in self.remote_clients:
                 # dont broadcast the message back to source socket
                 if not (remote_client.get_address()[1] == src_port):
-                    remote_client.say(src_data)
+                    remote_client.tx(src_data)
         except Exception, e:
             print "er Broadcasting"
             print str(e)
@@ -305,4 +313,4 @@ if __name__ == '__main__':
     print ("server address", chatroom.getsockname())
     print "started"
     # polls "channels" only stops only when all these have been closed
-    asyncore.loop()
+    asyncore.loop(timeout=5.0)
