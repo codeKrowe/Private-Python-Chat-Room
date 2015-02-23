@@ -46,7 +46,6 @@ class ChatRoomFrame(wx.Frame):
         """
         Send a message and close frame
         """
-        print "!11111111111"
         try:
             # Get Text Entered
             data = self.ctrl.GetValue()
