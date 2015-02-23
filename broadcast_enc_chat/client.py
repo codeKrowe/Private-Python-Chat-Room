@@ -11,7 +11,7 @@ import random
 
 # Hard Coded port for testing
 # MUST BE CHANGED TO WHATEVER PORT SERVER SETS
-PORT = 49987
+PORT =  61936
 HOST = 'localhost'
 BUFSIZE = 1024
 ADDR = (HOST, PORT)
@@ -157,27 +157,16 @@ class Client:
         # Python dictionary then remove the objects
         else:
             try:
-                print "11111111"
                 pk1 = self.client.recv(1792)
-                print "2222222"
                 pk2 = self.client.recv(1792)
-                print "333333"
                 pk1 = self.rsa.decrypt_text(pk1, self.private_key)
-                print "4444444"
                 pk2 = self.rsa.decrypt_text(pk2, self.private_key)
-                print "55555555"
                 defragment = pk2 + pk1
-                print "6666666"
                 defragment = self.rsa.decrypt_with_public(defragment, self.ServerPublicKey)
-                print "7777777"
                 h = defragment[-32:]
-                print "8888888"
                 defragment = defragment[:-32]
-                print "999999999"
                 h2 = self.md5_crypt.hashStringENC(defragment)
-                print "12341234"
                 dictObj = pickle.loads(defragment)
-                print "098y807t"
 
                 if h == h2 and dictObj["cnonce"] == nonce and dictObj["snonce"] == snonce:
                     p = dictObj["p"]
@@ -232,49 +221,49 @@ class Client:
 
 
 
-        def recv():
-            while True:
-                data = self.client.recv(1024)
-                if not data: sys.exit(0)
-                print "***************************************"
-                print "Recv Encypted Broadcast:", data
-                data = self.a.dec_str(data)
-                type(data)
-                print "Decrypting:", data
+        # def recv():
+        #     while True:
+        #         data = self.client.recv(1024)
+        #         if not data: sys.exit(0)
+        #         print "***************************************"
+        #         print "Recv Encypted Broadcast:", data
+        #         data = self.a.dec_str(data)
+        #         type(data)
+        #         print "Decrypting:", data
 
-        Thread(target=recv).start()
-
-
-
-        while True:
-            try:
-            # take input from command terminal   -- change to GUI
-                data = raw_input('>> ')
-                if not data: print '>> '
-                data = self.a.enc_str(data)
-                dictobj = {'src_port' : self.client_src_port, 'data' : data}
-                pickdump = pickle.dumps(dictobj)
-                # print "size of pickle",sys.getsizeof(pickdump)
-
-                # concatente serialized message with hash
-                hashStr = self.md5_crypt.hashStringENC(pickdump)
-                finalmessage = pickdump + hashStr
-                if len(finalmessage) > 1024:
-                    print "message too large for recieve buffer"
-                else:
-                    self.client.send(finalmessage)
-            except:
-                print "send error"
+        # Thread(target=recv).start()
 
 
-        print "Client Shutdown"
-        self.client.close()
-        sys.exit()
+
+        # while True:
+        #     try:
+        #     # take input from command terminal   -- change to GUI
+        #         data = raw_input('>> ')
+        #         if not data: print '>> '
+        #         data = self.a.enc_str(data)
+        #         dictobj = {'src_port' : self.client_src_port, 'data' : data}
+        #         pickdump = pickle.dumps(dictobj)
+        #         # print "size of pickle",sys.getsizeof(pickdump)
+
+        #         # concatente serialized message with hash
+        #         hashStr = self.md5_crypt.hashStringENC(pickdump)
+        #         finalmessage = pickdump + hashStr
+        #         if len(finalmessage) > 1024:
+        #             print "message too large for recieve buffer"
+        #         else:
+        #             self.client.send(finalmessage)
+        #     except:
+        #         print "send error"
 
 
-def main():
-    c = Client()
-    c.setUpClient()
+        # print "Client Shutdown"
+        # self.client.close()
+        # sys.exit()
+
+
+# def main():
+#     c = Client()
+#     c.setUpClient()
 
 if __name__ == '__main__':
     main()

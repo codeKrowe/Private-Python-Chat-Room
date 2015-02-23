@@ -18,6 +18,9 @@ from client import Client
 import traceback
 
 
+
+
+
 # Method to return current system time
 def t():
     return "[" + time.strftime("%H:%M:%S") + "] "
@@ -29,6 +32,8 @@ class ChatRoomFrame(wx.Frame):
         """Constructor"""
         self.client = Client()
         self.client.setUpClient()
+        # starts a InterProcess Communication Thread
+
         wx.Frame.__init__(self, None, -1, "Chat Room")
         panel = wx.Panel(self)
 
@@ -37,6 +42,7 @@ class ChatRoomFrame(wx.Frame):
         self.text = wx.TextCtrl(self, style=wx.TE_MULTILINE)
         self.ctrl = wx.TextCtrl(self, style=wx.TE_PROCESS_ENTER, size=(300, 25))
 
+        self.IPC = IPC_Read(self.client, self.text, self.ctrl)
         sizer.Add(self.text, 5, wx.EXPAND)
         sizer.Add(self.ctrl, 0, wx.EXPAND)
         self.SetSizer(sizer)
@@ -77,6 +83,8 @@ class DirectConnection(wx.Frame):
 
     def __init__(self):
         """Constructor"""
+
+        
         wx.Frame.__init__(self, None, -1, "Connect To Frame")
         panel = wx.Panel(self)
 
@@ -151,6 +159,29 @@ class MainFrame(wx.Frame):
     def __init__(self):
         wx.Frame.__init__(self, None, -1, "Chat Client")
         panel = MainPanel(self)
+
+
+class IPC_Read(Thread):
+
+    def __init__(self, client, text, ctrl):
+        """Initialize"""
+        Thread.__init__(self)
+        self.client = client
+        self.start()
+        self.text = text
+        self.ctrl = ctrl
+
+    def run(self):
+        while True:
+            data = self.client.client.recv(1024)
+            if not data: sys.exit(0)
+            print "***************************************"
+            print "Recv Encypted Broadcast:", data
+            data = self.client.a.dec_str(data)
+            type(data)
+            print "Decrypting:", data
+            self.text.SetValue(data)
+            self.ctrl.SetValue("")
 
 if __name__ == "__main__":
     app = wx.App(False)
