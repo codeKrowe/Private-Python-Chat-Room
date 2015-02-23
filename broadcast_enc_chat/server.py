@@ -52,14 +52,19 @@ CLIENT_ID_STORE ={}
 CLIENT_ID = []
 
 class RemoteClient(asyncore.dispatcher):
-    #Wraps a remote client socket
+    #Wrapper for client sockets
     def __init__(self, host, socket, address):
         asyncore.dispatcher.__init__(self, socket)
         self.host = host
         self.address = address
-        #collections.deque()
         #list-like container with fast appends and pops on either end
         self.outQ = collections.deque()
+    
+    def handle_close(self):
+        self.close()
+
+    def handle_expt(self):
+        self.close()
 
     def tx(self, message):
         # appending message to the message queue
