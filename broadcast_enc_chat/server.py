@@ -295,6 +295,20 @@ class Chatroom(asyncore.dispatcher):
             dictObj = pickle.loads(message)
             src_port = dictObj["src_port"]
             src_data = dictObj["data"]
+
+            # IF a <list> command (message) is sent then
+            # send back a string of connected ports 
+            if dictObj["list"] == True:
+                connlist = "Conn_list "
+                for remote_client in self.remote_clients:
+                    connlist = connlist + " : " + str(remote_client.get_address()[1])
+
+                print connlist
+                connlist = aesObj.enc_str(connlist)
+                print connlist
+                print "here"      
+
+
             # Check the Integrity of recived data vrs the new hash of extraced obj
             if test_hash == orginal_hash:
                 "Integrity Verified"
@@ -309,6 +323,9 @@ class Chatroom(asyncore.dispatcher):
                 # dont broadcast the message back to source socket
                 if not (remote_client.get_address()[1] == src_port):
                     remote_client.tx(src_data)
+                if remote_client.get_address()[1] == src_port and dictObj["list"] == True:
+                    remote_client.send(connlist)
+
         except Exception, e:
             print "er Broadcasting"
             print str(e)

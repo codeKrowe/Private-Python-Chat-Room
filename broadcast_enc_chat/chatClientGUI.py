@@ -51,14 +51,14 @@ class ChatRoomFrame(wx.Frame):
             # Get Text Entered
             data = self.ctrl.GetValue()
             # Display the text just entered by client.
+            l = False
+            if data == "<list>":
+                l = True
+
             self.text.SetValue(t()+ data)
             self.ctrl.SetValue("")
-            print "test1"
-            print data
-
             data = self.client.a.enc_str(str(data))
-            print "here test2"
-            dictobj = {'src_port' : self.client.client_src_port, 'data' : data}
+            dictobj = {'src_port' : self.client.client_src_port, 'data' : data, "list": l}
             pickdump = pickle.dumps(dictobj)
             # concatente serialized message with hash
             hashStr = self.client.md5_crypt.hashStringENC(pickdump)
