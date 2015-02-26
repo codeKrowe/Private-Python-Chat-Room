@@ -38,12 +38,13 @@ class ChatRoomFrame(wx.Frame):
         panel = wx.Panel(self)
 
         sizer = wx.BoxSizer(wx.VERTICAL)
-        # get rid of readonly to display text
-        self.text = wx.TextCtrl(self, style=wx.TE_MULTILINE)
+
+        # Create a messages display box
+        self.text_send = wx.TextCtrl(self, style=wx.TE_MULTILINE | wx.TE_LEFT | wx.BORDER_NONE | wx.TE_READONLY)
         self.ctrl = wx.TextCtrl(self, style=wx.TE_PROCESS_ENTER, size=(300, 25))
 
-        self.IPC = IPC_Read(self.client, self.text, self.ctrl)
-        sizer.Add(self.text, 5, wx.EXPAND)
+        self.IPC = IPC_Read(self.client, self.text_send , self.ctrl)
+        sizer.Add(self.text_send, 5, wx.EXPAND)
         sizer.Add(self.ctrl, 0, wx.EXPAND)
         self.SetSizer(sizer)
         self.ctrl.Bind(wx.EVT_TEXT_ENTER, self.onSend)
@@ -60,7 +61,7 @@ class ChatRoomFrame(wx.Frame):
             if data == "<list>":
                 l = True
 
-            self.text.SetValue(t()+ data)
+            self.text_send.AppendText("\n" + t() + data + "\n")
             self.ctrl.SetValue("")
             data = self.client.a.enc_str(str(data))
             dictobj = {'src_port' : self.client.client_src_port, 'data' : data, "list": l}
@@ -84,7 +85,7 @@ class DirectConnection(wx.Frame):
     def __init__(self):
         """Constructor"""
 
-        
+
         wx.Frame.__init__(self, None, -1, "Connect To Frame")
         panel = wx.Panel(self)
 
@@ -126,13 +127,6 @@ class MainPanel(wx.Panel):
         # Add a button to connect to someone
         self.connect_to_button = wx.Button(self, -1, label="Connect To")
 
-        # Add buttons to panel
-        # sizer.Add(self.chat_room_button, (0, 1))
-        # sizer.Add(self.connect_to_button, (1, 1))
-
-        # self.pubsubText = wx.TextCtrl(self, value="")
-        # hideBtn = wx.Button(self, label="Open a new window")
-        # hideBtn.Bind(wx.EVT_BUTTON, self.hideFrame)
         self.chat_room_button.Bind(wx.EVT_BUTTON, self.openChatRoom)
         self.connect_to_button.Bind(wx.EVT_BUTTON, self.openConnectTo)
 
@@ -163,12 +157,12 @@ class MainFrame(wx.Frame):
 
 class IPC_Read(Thread):
 
-    def __init__(self, client, text, ctrl):
+    def __init__(self, client, text_send, ctrl):
         """Initialize"""
         Thread.__init__(self)
         self.client = client
         self.start()
-        self.text = text
+        self.text_send = text_send
         self.ctrl = ctrl
 
     def run(self):
@@ -178,11 +172,9 @@ class IPC_Read(Thread):
             print "***************************************"
             print "Recv Encypted Broadcast:", data
             data = self.client.a.dec_str(data)
-            type(data)
             print "Decrypting:", data
-            self.text.SetValue(data)
-            self.ctrl.SetValue("")
 
+            self.text_send.AppendText("\n" + t() + data + "\n")
 if __name__ == "__main__":
     app = wx.App(False)
     frame = MainFrame()
