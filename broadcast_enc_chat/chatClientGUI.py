@@ -3,7 +3,8 @@
 import wx
 from wx.lib.pubsub import pub
 
-from socket import *
+import socket
+# from socket import *
 from threading import Thread
 import sys
 import chilkat
@@ -44,6 +45,10 @@ class ChatRoomFrame(wx.Frame):
         self.ctrl = wx.TextCtrl(self, style=wx.TE_PROCESS_ENTER, size=(300, 25))
 
         self.IPC = IPC_Read(self.client, self.text_send , self.ctrl)
+
+       	self.newSocketRead = None#P2P_READ()
+
+
         sizer.Add(self.text_send, 5, wx.EXPAND)
         sizer.Add(self.ctrl, 0, wx.EXPAND)
         self.SetSizer(sizer)
@@ -61,18 +66,46 @@ class ChatRoomFrame(wx.Frame):
             if data == "<list>":
                 l = True
 
-            self.text_send.AppendText("\n" + t() + data + "\n")
-            self.ctrl.SetValue("")
-            data = self.client.a.enc_str(str(data))
-            dictobj = {'src_port' : self.client.client_src_port, 'data' : data, "list": l}
-            pickdump = pickle.dumps(dictobj)
-            # concatente serialized message with hash
-            hashStr = self.client.md5_crypt.hashStringENC(pickdump)
-            finalmessage = pickdump + hashStr
-            if len(finalmessage) > 1024:
-                print "message too large for recieve buffer"
+            elif data == "<getnewSocket>":
+                self.newSocketRead = P2P_READ()
+                sleep(0.1)
+                print "************New Socket Binding************"
+            	print self.newSocketRead.get_address()[1]
+                data = "This is Test Message from the New Socket"
+                data = self.client.a.enc_str(str(data))
+                # True for AES, False for RSA
+                filetx = True
+                dictobj = {'src_port' : self.client.client_src_port, 'data' : data, "list": l,\
+                 "newSock": self.newSocketRead.get_address()[1], "file_TX_enc_type": filetx}
+
+                pickdump = pickle.dumps(dictobj)
+                # concatente serialized message with hash
+                hashStr = self.client.md5_crypt.hashStringENC(pickdump)
+                finalmessage = pickdump + hashStr
+                if len(finalmessage) > 1024:
+                    print "message too large for recieve buffer"
+                else:
+                    self.client.client.send(finalmessage)
+
+            elif data == "<send>":
+				d2 = "Testing Sending from second Thread - new Socket"
+				port = 49961
+				p2p_send = P2P_SEND(port, d2)
+
             else:
-                self.client.client.send(finalmessage)
+                self.text_send.AppendText("\n" + t() + data + "\n")
+                self.ctrl.SetValue("")
+                data = self.client.a.enc_str(str(data))
+                dictobj = {'src_port' : self.client.client_src_port, 'data' : data, "list": l}
+                pickdump = pickle.dumps(dictobj)
+                # concatente serialized message with hash
+                hashStr = self.client.md5_crypt.hashStringENC(pickdump)
+                finalmessage = pickdump + hashStr
+                if len(finalmessage) > 1024:
+                    print "message too large for recieve buffer"
+                else:
+                    self.client.client.send(finalmessage)
+
         except Exception, err:
             print "send error"
             print traceback.format_exc()
@@ -156,7 +189,6 @@ class MainFrame(wx.Frame):
 
 
 class IPC_Read(Thread):
-
     def __init__(self, client, text_send, ctrl):
         """Initialize"""
         Thread.__init__(self)
@@ -173,8 +205,52 @@ class IPC_Read(Thread):
             print "Recv Encypted Broadcast:", data
             data = self.client.a.dec_str(data)
             print "Decrypting:", data
-
             self.text_send.AppendText("\n" + t() + data + "\n")
+
+
+class P2P_READ(Thread):
+	def __init__(self):
+		Thread.__init__(self)
+		self.socket = None
+		self.newReadSocketAddress = None
+		self.start()
+
+	def run(self):
+		s = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
+		s.bind(('localhost', 0))
+		newSocketAddress = s.getsockname()
+		self.newReadSocketAddress = newSocketAddress
+		# print newSocketAddress
+		s.listen(1)
+		print "second socket exec"
+		self.socket = s
+		# self.socket.listen(0)
+		sock, addr = self.socket.accept()
+		data = sock.recv(1024)
+		print data
+		sock.close()
+		print "socket Closed"
+
+	def get_address(self):
+		return self.newReadSocketAddress
+
+
+class P2P_SEND(Thread):
+	def __init__(self, dst_port, data):
+		Thread.__init__(self)
+		self.data = data
+		self.dst_port = dst_port
+		self.start()
+
+	def run(self):
+		s = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
+		s.connect(('localhost', self.dst_port))	
+		s.send(self.data)
+		print "tx complete"
+		s.close()
+
+
+
 if __name__ == "__main__":
     app = wx.App(False)
     frame = MainFrame()
