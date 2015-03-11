@@ -19,7 +19,11 @@ from client import Client
 import traceback
 from multiprocessing import Process, Value, Array, Manager
 
-
+# Commands FileTX
+# <list>                              - gets list connected scockets
+# 6DCC655077693A5E1ED5857314A0F96D    - Inits Tranfser
+# use like this (66666 = destination socket)
+# 6DCC655077693A5E1ED5857314A0F96D:66666
 
 
 # Method to return current system time
@@ -48,10 +52,11 @@ class ChatRoomFrame(wx.Frame):
 
         self.manager = Manager()
         self.Shared_Mem_Dictionary = self.manager.dict()
-        self.Shared_Mem_Dictionary["filetxID"]= "6DCC655077693A5E1ED5857314A0F96D"
-        self.Shared_Mem_Dictionary["init_File_Server_mode"]= False
+        self.filetxID = "6DCC655077693A5E1ED5857314A0F96D"
+        self.filetxID_Final = "2D56DE9597CFF43DD5C1335D509517C9"
+        self.init_File_Server_mode = False
         self.Shared_Mem_Dictionary["p2p_dest"]= 0
-        self.IPC = IPC_Read(self.client, self.text_send , self.ctrl,self.Shared_Mem_Dictionary, self)
+        self.IPC = IPC_Read(self.client, self.text_send , self.ctrl, self)
        	self.newSocketRead = None#P2P_READ()
 
 
@@ -69,7 +74,7 @@ class ChatRoomFrame(wx.Frame):
         sleep(0.1)
         print "************New Socket Binding************"
         print self.newSocketRead.get_address()[1]
-        data = "This_is_Test_Message_for_filetx"
+        data = "2D56DE9597CFF43DD5C1335D509517C9:" + str(self.newSocketRead.get_address()[1])
         data = self.client.a.enc_str(str(data))
         # True for AES, False for RSA
         filetx = True
@@ -84,7 +89,7 @@ class ChatRoomFrame(wx.Frame):
             print "message too large for recieve buffer"
         else:
             self.client.client.send(finalmessage)
-        self.Shared_Mem_Dictionary["init_File_Server_mode"] == False
+        self.init_File_Server_mode == False
 
     def onSend(self, event):
         def standard_send(data):
@@ -120,7 +125,7 @@ class ChatRoomFrame(wx.Frame):
                 print type(p2p)
                 bind_to_new(p2p)
 
-            elif self.Shared_Mem_Dictionary["filetxID"] == data[:32]:
+            elif self.filetxID == data[:32]:
                 data = data[:32] +":" +data[33:]# + "-" +str(self.client.client_src_port)
                 print "data", data
                 standard_send(data)
@@ -230,14 +235,13 @@ class MainFrame(wx.Frame):
 
 
 class IPC_Read(Thread):
-    def __init__(self, client, text_send, ctrl,Shared_Mem_Dictionary, caller):
+    def __init__(self, client, text_send, ctrl, caller):
         """Initialize"""
         Thread.__init__(self)
         self.client = client
         self.caller = caller
         self.text_send = text_send
         self.ctrl = ctrl
-        self.Shared_Mem_Dictionary = Shared_Mem_Dictionary
         self.start()
 
     def run(self):
@@ -250,13 +254,24 @@ class IPC_Read(Thread):
             data = packet["data"]
             src_port = packet["src_port"]
             data = self.client.a.dec_str(data)
-            if data[:32] == self.Shared_Mem_Dictionary["filetxID"] and int(data[33:]) == int(self.client.client_src_port):
-                self.Shared_Mem_Dictionary["init_File_Server_mode"] = True
+
+            print "lenght of recived packet = ", len(data)
+
+            if (len(data) > 32) and data[:32] == self.caller.filetxID and int(data[33:]) == int(self.client.client_src_port):
+                self.caller.init_File_Server_mode = True
                 # dst_p2p_port = data[33:]
                 print 'dst_p2p_port', src_port
                 self.caller.bind_to_new(int(src_port))
                 print "value change shared Shared_Mem_Dictionary"
             print "Decrypting:", data
+
+            if (len(data) > 32) and data[:32] == self.caller.filetxID_Final:
+            	newFileServerSocketAddress = int(data[33:])
+            	print "Got the new Server Socket - Returned From Server"
+            	print newFileServerSocketAddress
+            	d2 = "filetx from second Thread - Client!!!!!!!!!!!!!!!!!!!!!!!!!"
+            	p2p_send = P2P_SEND(newFileServerSocketAddress, d2)
+
             self.text_send.AppendText("\n" + t() + data + "\n")
 
 
