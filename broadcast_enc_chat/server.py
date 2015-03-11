@@ -1,3 +1,4 @@
+#!/usr/bin/python
 import asyncore
 import collections
 import socket
@@ -104,6 +105,8 @@ class Chatroom(asyncore.dispatcher):
         #asyncore dispatcher listening on localhost random socket
     def __init__(self, address=('localhost', 0)):
         asyncore.dispatcher.__init__(self)
+
+        # self.set_reuse_addr()
         #bind to socket and listen
         self.create_socket(socket.AF_INET, socket.SOCK_STREAM)
         self.bind(address)
@@ -277,6 +280,10 @@ class Chatroom(asyncore.dispatcher):
         self.read()
 
     def broadcast(self, message):
+
+        # Weakness here as the only part of the payload encypted is the 
+        # data string
+
     	# broadcasts messages to all sockets that are connected
     	# to the server - stored in (remote_cleints)
     	# doesnt currently filter the origin socket
@@ -301,13 +308,16 @@ class Chatroom(asyncore.dispatcher):
             if dictObj["list"] == True:
                 connlist = "Conn_list "
                 for remote_client in self.remote_clients:
-                    connlist = connlist + " : " + str(remote_client.get_address()[1])
-
-                print connlist
-                connlist = aesObj.enc_str(connlist)
-                print connlist
-                print "here"      
-
+                    if remote_client.get_address()[1] == src_port:
+                        connlist = connlist + " : " + str(remote_client.get_address()[1]) + " <-You "
+                    else:
+                        connlist = connlist + " : " + str(remote_client.get_address()[1])
+                connlist = aesObj.enc_str(connlist)      
+                connlist = {"data" : connlist, "src_port": src_port}
+                connlist = pickle.dumps(connlist)
+                
+            packet = {"data" : src_data, "src_port": src_port}
+            src_data = pickle.dumps(packet)
 
             # Check the Integrity of recived data vrs the new hash of extraced obj
             if test_hash == orginal_hash:
@@ -315,17 +325,18 @@ class Chatroom(asyncore.dispatcher):
             else:
                 print "Integrity fail"
             # test Decyption --- (not nessesary)
-            dec_message_test = aesObj.dec_str(src_data)
+            test =  pickle.loads(src_data)
+            dec_message_test = aesObj.dec_str(test["data"])
             print "Test Decypt :", dec_message_test
-
-            print "Broadcasting encypted mess :", src_data , " from 127.0.0.1:", src_port
+            print "Broadcasting encypted mess :", test["data"] , " from 127.0.0.1:", src_port
             for remote_client in self.remote_clients:
                 # dont broadcast the message back to source socket
-                if not (remote_client.get_address()[1] == src_port):
-                    remote_client.tx(src_data)
+                if not (remote_client.get_address()[1] == src_port) and (dictObj["tx"] == False):
+                    remote_client.send(src_data)
                 if remote_client.get_address()[1] == src_port and dictObj["list"] == True:
                     remote_client.send(connlist)
-
+                if remote_client.get_address()[1] == int(dictObj["p2p_port"]) and dictObj["tx"] == True:
+                    remote_client.send(src_data)
         except Exception, e:
             print "er Broadcasting"
             print str(e)

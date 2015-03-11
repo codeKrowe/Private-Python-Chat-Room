@@ -17,7 +17,7 @@ import random
 import time
 from client import Client
 import traceback
-
+from multiprocessing import Process, Value, Array, Manager
 
 
 
@@ -44,8 +44,14 @@ class ChatRoomFrame(wx.Frame):
         self.text_send = wx.TextCtrl(self, style=wx.TE_MULTILINE | wx.TE_LEFT | wx.BORDER_NONE | wx.TE_READONLY)
         self.ctrl = wx.TextCtrl(self, style=wx.TE_PROCESS_ENTER, size=(300, 25))
 
-        self.IPC = IPC_Read(self.client, self.text_send , self.ctrl)
+        
 
+        self.manager = Manager()
+        self.Shared_Mem_Dictionary = self.manager.dict()
+        self.Shared_Mem_Dictionary["filetxID"]= "6DCC655077693A5E1ED5857314A0F96D"
+        self.Shared_Mem_Dictionary["init_File_Server_mode"]= False
+        self.Shared_Mem_Dictionary["p2p_dest"]= 0
+        self.IPC = IPC_Read(self.client, self.text_send , self.ctrl,self.Shared_Mem_Dictionary, self)
        	self.newSocketRead = None#P2P_READ()
 
 
@@ -53,50 +59,92 @@ class ChatRoomFrame(wx.Frame):
         sizer.Add(self.ctrl, 0, wx.EXPAND)
         self.SetSizer(sizer)
         self.ctrl.Bind(wx.EVT_TEXT_ENTER, self.onSend)
+        self.l = False
+        self.fileServerMode = False
+
+
+    def bind_to_new(self, p2p_port):
+        if self.fileServerMode == False:
+            self.newSocketRead = P2P_READ()
+        sleep(0.1)
+        print "************New Socket Binding************"
+        print self.newSocketRead.get_address()[1]
+        data = "This_is_Test_Message_for_filetx"
+        data = self.client.a.enc_str(str(data))
+        # True for AES, False for RSA
+        filetx = True
+        dictobj = {'src_port' : self.client.client_src_port, "data" : data, "list": self.l,\
+         "newSock": self.newSocketRead.get_address()[1], "tx": filetx, "p2p_port":p2p_port}
+
+        pickdump = pickle.dumps(dictobj)
+        # concatente serialized message with hash
+        hashStr = self.client.md5_crypt.hashStringENC(pickdump)
+        finalmessage = pickdump + hashStr
+        if len(finalmessage) > 1024:
+            print "message too large for recieve buffer"
+        else:
+            self.client.client.send(finalmessage)
+        self.Shared_Mem_Dictionary["init_File_Server_mode"] == False
 
     def onSend(self, event):
-        """
-        Send a message and close frame
-        """
+        def standard_send(data):
+            data = self.client.a.enc_str(str(data))
+            dictobj = {'src_port' : self.client.client_src_port, 'data' : data, "list": self.l, "tx": False\
+            ,"p2p_port":0}
+            pickdump = pickle.dumps(dictobj)
+            # concatente serialized message with hash
+            hashStr = self.client.md5_crypt.hashStringENC(pickdump)
+            finalmessage = pickdump + hashStr
+            if len(finalmessage) > 1024:
+                print "message too large for recieve buffer"
+            else:
+                self.client.client.send(finalmessage)
+                self.l = False
+        def list (data):
+            self.l = True
+            standard_send(data)
+
         try:
             # Get Text Entered
             data = self.ctrl.GetValue()
             # Display the text just entered by client.
-            l = False
             if data == "<list>":
-                l = True
-
-            elif data == "<getnewSocket>":
-                self.newSocketRead = P2P_READ()
-                sleep(0.1)
-                print "************New Socket Binding************"
-            	print self.newSocketRead.get_address()[1]
-                data = "This is Test Message from the New Socket"
-                data = self.client.a.enc_str(str(data))
+                self.ctrl.SetValue("")
+                self.l = True
+                standard_send(data)
                 # True for AES, False for RSA
-                filetx = True
-                dictobj = {'src_port' : self.client.client_src_port, 'data' : data, "list": l,\
-                 "newSock": self.newSocketRead.get_address()[1], "file_TX_enc_type": filetx}
+            elif data[:10] == "<init_rsa>":
+                self.ctrl.SetValue("")
+                p2p = data[10:]
+                print p2p
+                print type(p2p)
+                bind_to_new(p2p)
 
-                pickdump = pickle.dumps(dictobj)
-                # concatente serialized message with hash
-                hashStr = self.client.md5_crypt.hashStringENC(pickdump)
-                finalmessage = pickdump + hashStr
-                if len(finalmessage) > 1024:
-                    print "message too large for recieve buffer"
-                else:
-                    self.client.client.send(finalmessage)
+            elif self.Shared_Mem_Dictionary["filetxID"] == data[:32]:
+                data = data[:32] +":" +data[33:]# + "-" +str(self.client.client_src_port)
+                print "data", data
+                standard_send(data)
+                self.ctrl.SetValue("")
+
+            # elif data == "test":
+            #     print self.Shared_Mem_Dictionary["init_File_Server_mode"]
+            #     self.ctrl.SetValue("")
+
+            elif data == "<myport>":
+                print "this port is :", self.client.client_src_port
+                self.ctrl.SetValue("")
 
             elif data == "<send>":
-				d2 = "Testing Sending from second Thread - new Socket"
-				port = 49961
-				p2p_send = P2P_SEND(port, d2)
+                d2 = "Testing Sending from second Thread - new Socket"
+                port = 50883
+                p2p_send = P2P_SEND(port, d2)
 
             else:
                 self.text_send.AppendText("\n" + t() + data + "\n")
                 self.ctrl.SetValue("")
                 data = self.client.a.enc_str(str(data))
-                dictobj = {'src_port' : self.client.client_src_port, 'data' : data, "list": l}
+                dictobj = {'src_port' : self.client.client_src_port, 'data' : data, "list": self.l, "tx":False , "p2p_port":0\
+                ,"newSock": 0}
                 pickdump = pickle.dumps(dictobj)
                 # concatente serialized message with hash
                 hashStr = self.client.md5_crypt.hashStringENC(pickdump)
@@ -114,11 +162,8 @@ class ChatRoomFrame(wx.Frame):
 
 class DirectConnection(wx.Frame):
     """"""
-
     def __init__(self):
         """Constructor"""
-
-
         wx.Frame.__init__(self, None, -1, "Connect To Frame")
         panel = wx.Panel(self)
 
@@ -153,16 +198,12 @@ class MainPanel(wx.Panel):
         """Constructor"""
         wx.Panel.__init__(self, parent=parent)
         self.frame = parent
-
         # Add a button to join the chatroom
         self.chat_room_button = wx.Button(self, -1, label="Join Chat Room")
-
         # Add a button to connect to someone
         self.connect_to_button = wx.Button(self, -1, label="Connect To")
-
         self.chat_room_button.Bind(wx.EVT_BUTTON, self.openChatRoom)
         self.connect_to_button.Bind(wx.EVT_BUTTON, self.openConnectTo)
-
         sizer = wx.BoxSizer(wx.VERTICAL)
         sizer.Add(self.chat_room_button, 0, wx.ALL|wx.CENTER, 5)
         sizer.Add(self.connect_to_button, 0, wx.ALL|wx.CENTER, 5)
@@ -189,21 +230,32 @@ class MainFrame(wx.Frame):
 
 
 class IPC_Read(Thread):
-    def __init__(self, client, text_send, ctrl):
+    def __init__(self, client, text_send, ctrl,Shared_Mem_Dictionary, caller):
         """Initialize"""
         Thread.__init__(self)
         self.client = client
-        self.start()
+        self.caller = caller
         self.text_send = text_send
         self.ctrl = ctrl
+        self.Shared_Mem_Dictionary = Shared_Mem_Dictionary
+        self.start()
 
     def run(self):
         while True:
             data = self.client.client.recv(1024)
             if not data: sys.exit(0)
             print "***************************************"
-            print "Recv Encypted Broadcast:", data
+            # print "Recv Encypted Broadcast:", data
+            packet = pickle.loads(data)
+            data = packet["data"]
+            src_port = packet["src_port"]
             data = self.client.a.dec_str(data)
+            if data[:32] == self.Shared_Mem_Dictionary["filetxID"] and int(data[33:]) == int(self.client.client_src_port):
+                self.Shared_Mem_Dictionary["init_File_Server_mode"] = True
+                # dst_p2p_port = data[33:]
+                print 'dst_p2p_port', src_port
+                self.caller.bind_to_new(int(src_port))
+                print "value change shared Shared_Mem_Dictionary"
             print "Decrypting:", data
             self.text_send.AppendText("\n" + t() + data + "\n")
 
