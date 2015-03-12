@@ -11,6 +11,8 @@ from AES_Class import *
 from RSAClass import *
 import random
 
+#version 2.0
+
 rsa = RSAClass()
 
 privkey = chilkat.CkPrivateKey()

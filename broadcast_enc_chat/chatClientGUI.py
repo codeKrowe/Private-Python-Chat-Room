@@ -1,4 +1,5 @@
 #!/usr/bin/python
+# version 2.0
 
 import wx
 from wx.lib.pubsub import pub

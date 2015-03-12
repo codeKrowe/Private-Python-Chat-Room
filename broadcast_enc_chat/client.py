@@ -9,9 +9,11 @@ from AES_Class import *
 from RSAClass import *
 import random
 
+# version 2.0
+
 # Hard Coded port for testing
 # MUST BE CHANGED TO WHATEVER PORT SERVER SETS
-PORT =    53905
+PORT =    60858
 HOST = 'localhost'
 BUFSIZE = 1024
 ADDR = (HOST, PORT)
