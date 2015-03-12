@@ -122,12 +122,11 @@ class ChatRoomFrame(wx.Frame):
                 self.l = True
                 standard_send(data)
                 # True for AES, False for RSA
-            elif data[:10] == "<init_rsa>":
+            elif data[:9] == "<init_tx>":
+                data = self.filetxID +":" +data[10:]# + "-" +str(self.client.client_src_port)
+                print "data", data
+                standard_send(data)
                 self.ctrl.SetValue("")
-                p2p = data[10:]
-                print p2p
-                print type(p2p)
-                bind_to_new(p2p)
 
             # Check if data has the initiate file transfer HEX code
             # and a destination port
@@ -271,13 +270,13 @@ class IPC_Read(Thread):
             data = packet["data"]
             src_port = packet["src_port"]
 
-            if packet["FTX_ENC"] == 2:
-            	self.fileTransferEncryption = 2
-            	print "***********************-setting RSA Mode-***************************"
+            # if packet["FTX_ENC"] == 2:
+            # 	self.fileTransferEncryption = 2
+            # 	print "***********************-setting RSA Mode-***************************"
 
-            elif packet["FTX_ENC"] == 1:
-            	self.fileTransferEncryption = 1
-            	print "***********************-setting AES Mode-***************************"
+            # elif packet["FTX_ENC"] == 1:
+            # 	self.fileTransferEncryption = 1
+            # 	print "***********************-setting AES Mode-***************************"
 
             data = self.client.a.dec_str(data)
 
