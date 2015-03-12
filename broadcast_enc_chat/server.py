@@ -302,6 +302,7 @@ class Chatroom(asyncore.dispatcher):
             dictObj = pickle.loads(message)
             src_port = dictObj["src_port"]
             src_data = dictObj["data"]
+            mode = dictObj["FTX_ENC"]
 
             # IF a <list> command (message) is sent then
             # send back a string of connected ports 
@@ -313,10 +314,10 @@ class Chatroom(asyncore.dispatcher):
                     else:
                         connlist = connlist + " : " + str(remote_client.get_address()[1])
                 connlist = aesObj.enc_str(connlist)      
-                connlist = {"data" : connlist, "src_port": src_port}
+                connlist = {"data" : connlist, "src_port": src_port, "FTX_ENC": mode}
                 connlist = pickle.dumps(connlist)
                 
-            packet = {"data" : src_data, "src_port": src_port}
+            packet = {"data" : src_data, "src_port": src_port, "FTX_ENC": mode}
             src_data = pickle.dumps(packet)
 
             # Check the Integrity of recived data vrs the new hash of extraced obj

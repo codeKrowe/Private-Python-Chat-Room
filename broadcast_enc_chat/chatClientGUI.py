@@ -145,8 +145,16 @@ class ChatRoomFrame(wx.Frame):
             elif data == "<rsa>":
             	self.text_send.AppendText("\n" + t() + "Entering RSA MODE" + "\n")
             	self.fileTransferEncryption = 2
+            	dat ="<Entering RSA MODE>"
+            	standard_send(dat)
+            	self.ctrl.SetValue("")
  				
-
+            elif data == "<aes>":
+            	self.text_send.AppendText("\n" + t() + "Entering AES MODE" + "\n")
+            	self.fileTransferEncryption = 1
+            	dat ="<Entering AES MODE>"
+            	standard_send(dat)
+            	self.ctrl.SetValue("")
             # elif data == "<send>":
             #     d2 = "Testing Sending from second Thread - new Socket"
             #     port = 50883
@@ -261,6 +269,15 @@ class IPC_Read(Thread):
             packet = pickle.loads(data)
             data = packet["data"]
             src_port = packet["src_port"]
+
+            if packet["FTX_ENC"] == 2:
+            	self.fileTransferEncryption = 2
+            	print "***********************-setting RSA Mode-***************************"
+
+            elif packet["FTX_ENC"] == 1:
+            	self.fileTransferEncryption = 1
+            	print "***********************-setting AES Mode-***************************"
+
             data = self.client.a.dec_str(data)
 
             print "lenght of recived packet = ", len(data)
