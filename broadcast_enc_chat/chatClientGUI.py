@@ -66,11 +66,14 @@ class ChatRoomFrame(wx.Frame):
         self.ctrl.Bind(wx.EVT_TEXT_ENTER, self.onSend)
         self.l = False
         self.fileServerMode = False
+        self.fileTransferEncryption = 1
 
 
     def bind_to_new(self, p2p_port):
-        if self.fileServerMode == False:
-            self.newSocketRead = P2P_READ()
+    	try:
+        	self.newSocketRead = P2P_READ(self.fileTransferEncryption)
+        except:
+        	print "An Erro Binding a new socket in a new thread"
         sleep(0.1)
         print "************New Socket Binding************"
         print self.newSocketRead.get_address()[1]
@@ -79,7 +82,7 @@ class ChatRoomFrame(wx.Frame):
         # True for AES, False for RSA
         filetx = True
         dictobj = {'src_port' : self.client.client_src_port, "data" : data, "list": self.l,\
-         "newSock": self.newSocketRead.get_address()[1], "tx": filetx, "p2p_port":p2p_port}
+         "newSock": self.newSocketRead.get_address()[1], "tx": filetx, "p2p_port":p2p_port, "FTX_ENC" :self.fileTransferEncryption}
 
         pickdump = pickle.dumps(dictobj)
         # concatente serialized message with hash
@@ -95,7 +98,7 @@ class ChatRoomFrame(wx.Frame):
         def standard_send(data):
             data = self.client.a.enc_str(str(data))
             dictobj = {'src_port' : self.client.client_src_port, 'data' : data, "list": self.l, "tx": False\
-            ,"p2p_port":0}
+            ,"p2p_port":0, "newSock": 0, "FTX_ENC" :self.fileTransferEncryption}
             pickdump = pickle.dumps(dictobj)
             # concatente serialized message with hash
             hashStr = self.client.md5_crypt.hashStringENC(pickdump)
@@ -125,31 +128,36 @@ class ChatRoomFrame(wx.Frame):
                 print type(p2p)
                 bind_to_new(p2p)
 
+            # Check if data has the initiate file transfer HEX code
+            # and a destination port
             elif self.filetxID == data[:32]:
                 data = data[:32] +":" +data[33:]# + "-" +str(self.client.client_src_port)
                 print "data", data
                 standard_send(data)
                 self.ctrl.SetValue("")
 
-            # elif data == "test":
-            #     print self.Shared_Mem_Dictionary["init_File_Server_mode"]
-            #     self.ctrl.SetValue("")
 
             elif data == "<myport>":
                 print "this port is :", self.client.client_src_port
+                self.text_send.AppendText("\n" + t() + "this port is :" + str(self.client.client_src_port) + "\n")
                 self.ctrl.SetValue("")
 
-            elif data == "<send>":
-                d2 = "Testing Sending from second Thread - new Socket"
-                port = 50883
-                p2p_send = P2P_SEND(port, d2)
+            elif data == "<rsa>":
+            	self.text_send.AppendText("\n" + t() + "Entering RSA MODE" + "\n")
+            	self.fileTransferEncryption = 2
+ 				
+
+            # elif data == "<send>":
+            #     d2 = "Testing Sending from second Thread - new Socket"
+            #     port = 50883
+            #     p2p_send = P2P_SEND(port, d2)
 
             else:
                 self.text_send.AppendText("\n" + t() + data + "\n")
                 self.ctrl.SetValue("")
                 data = self.client.a.enc_str(str(data))
                 dictobj = {'src_port' : self.client.client_src_port, 'data' : data, "list": self.l, "tx":False , "p2p_port":0\
-                ,"newSock": 0}
+                ,"newSock": 0, "FTX_ENC" :self.fileTransferEncryption}
                 pickdump = pickle.dumps(dictobj)
                 # concatente serialized message with hash
                 hashStr = self.client.md5_crypt.hashStringENC(pickdump)
@@ -276,10 +284,12 @@ class IPC_Read(Thread):
 
 
 class P2P_READ(Thread):
-	def __init__(self):
+	def __init__(self, mode):
 		Thread.__init__(self)
 		self.socket = None
 		self.newReadSocketAddress = None
+		self.mode = mode
+		self.process = None
 		self.start()
 
 	def run(self):
@@ -298,6 +308,12 @@ class P2P_READ(Thread):
 		sock.close()
 		print "socket Closed"
 
+	def stop(self):
+		print "Trying to stop thread "
+		if self.process is not None:
+			self.process.terminate()
+			self.process = None
+
 	def get_address(self):
 		return self.newReadSocketAddress
 
@@ -308,6 +324,7 @@ class P2P_SEND(Thread):
 		self.data = data
 		self.dst_port = dst_port
 		self.start()
+		self.process = None
 
 	def run(self):
 		s = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
@@ -316,6 +333,11 @@ class P2P_SEND(Thread):
 		print "tx complete"
 		s.close()
 
+	def stop(self):
+		print "Trying to stop thread "
+		if self.process is not None:
+			self.process.terminate()
+			self.process = None
 
 
 if __name__ == "__main__":
