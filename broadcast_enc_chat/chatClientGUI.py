@@ -19,6 +19,7 @@ import time
 from client import Client
 import traceback
 from multiprocessing import Process, Value, Array, Manager
+import binascii
 
 # Commands FileTX
 # <list>                              - gets list connected scockets
@@ -80,7 +81,7 @@ class ChatRoomFrame(wx.Frame):
 
     def bind_to_new(self, p2p_port):
     	try:
-        	self.newSocketRead = P2P_READ(self.fileTransferEncryption)
+        	self.newSocketRead = P2P_READ(self.fileTransferEncryption, self.client.public_key, self.client.private_key)
         except:
         	print "An Erro Binding a new socket in a new thread"
         sleep(0.1)
@@ -325,39 +326,59 @@ class IPC_Read(Thread):
 Binds to new Socket, waits for client to connect once it recieves the new port address
 (calling funtion sends this port back to the initiating client)"""
 class P2P_READ(Thread):
-    def __init__(self, mode):
+    def __init__(self, mode, public_key, private_key):
         Thread.__init__(self)
         self.socket = None
         self.newReadSocketAddress = None
         self.mode = mode
         self.process = None
+        self.public_key = public_key
+        self.private_key = private_key
         self.start()
 
     def run(self):
+        print "size of public_key", len(str(self.public_key))
         s = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
         s.bind(('localhost', 0))
         newSocketAddress = s.getsockname()
         self.newReadSocketAddress = newSocketAddress
+
+
         if self.mode == 1:
-    		s.listen(1)
-    		print "@@@@@@@@@@@@@@@@@@@@@@@@-SECOND SOCKET CREATED AES-@@@@@@@@@@@@@@@@@@@@@@"
-    		self.socket = s
-    		# self.socket.listen(0)
-    		sock, addr = self.socket.accept()
-    		data = sock.recv(1024)
-    		print data
-    		sock.close()
-    		print "@@@@@@@@@@@@@@@@@@@@@@@ new socket closed @@@@@@@@@@@@@@@@@@@@@@@@@@@@"
-        if self.mode == 2:
             s.listen(1)
-            print "@@@@@@@@@@@@@@@@@@@@@@@@-SECOND SOCKET CREATED RSA-@@@@@@@@@@@@@@@@@@@@@@"
+            print "@@@@@@@@@@@@@@@@@@@@@@@@-SECOND SOCKET CREATED AES-@@@@@@@@@@@@@@@@@@@@@@"
             self.socket = s
-            # self.socket.listen(0)
             sock, addr = self.socket.accept()
             data = sock.recv(1024)
             print data
             sock.close()
-            print "@@@@@@@@@@@@@@@@@@@@@@@ new socket closed @@@@@@@@@@@@@@@@@@@@@@@@@@@@"            
+            print "@@@@@@@@@@@@@@@@@@@@@@@ new socket closed @@@@@@@@@@@@@@@@@@@@@@@@@@@@"
+
+
+        if self.mode == 2:
+            s.listen(1)
+            print "@@@@@@@@@@@@@@@@@@@@@@@@-SECOND SOCKET CREATED RSA-@@@@@@@@@@@@@@@@@@@@@@"
+            self.socket = s
+            sock, addr = self.socket.accept()
+            sock.send(self.public_key)
+            rsa = RSAClass()
+            file_f = open("temp.jpg",'wb')
+            # data = sock.recv(1024)
+            block=sock.recv(4608)
+            #----receiving & decrypting-------
+            blockCounter = len(block)
+            while (block): 
+                print "RECIEVED", blockCounter, "Bytes"
+                block = rsa.decrypt_text(block, self.private_key)
+                unhexblock=binascii.unhexlify(block)
+                file_f.write(unhexblock)
+                block=sock.recv(4608)
+                blockCounter += len(block)
+            print "!!!!!!!!!!!!!!!!!!  FILETRANSFER COMPLETED !!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
+            file_f.close()        
+            sock.close()
+            print "@@@@@@@@@@@@@@@@@@@@@@@ new socket closed @@@@@@@@@@@@@@@@@@@@@@@@@@@@" 
+
     #termiate this thread once it has been used
     def stop(self):
         print "Trying to stop thread "
@@ -373,6 +394,7 @@ class P2P_SEND(Thread):
     def __init__(self, dst_port, data, mode):
         Thread.__init__(self)
         self.data = data
+        self.filename = "kali_linux.jpg"
         self.dst_port = dst_port
         self.mode = mode
         self.start()
@@ -381,16 +403,34 @@ class P2P_SEND(Thread):
     def run(self):
         if self.mode == 1:
             s = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
-            s.connect(('localhost', self.dst_port))	
+            s.connect(('localhost', self.dst_port))
             s.send(self.data)
             print "AES FILETRANSFER COMPLETE"
             s.close()
         if self.mode == 2:
+            rsa = RSAClass()
             s = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
             s.connect(('localhost', self.dst_port)) 
-            s.send(self.data)
-            print "RSA FILETRANSFER COMPLETE"
-            s.close()            
+            FSPUBLIC = s.recv(243)
+            print "recieved public_key from FileServerClient"
+            print FSPUBLIC
+            #get the total size of file in bytes
+            filesize = int(os.stat(self.filename).st_size)
+            file_f = open("kali_linux.jpg", "rb") 
+            block = file_f.read(1024)
+            blockCounter = len(block) 
+            while (block):
+                calc = (float(blockCounter)/float(filesize))*float(100)
+                print calc
+                hexblock=binascii.hexlify(block)
+                block = rsa.encrypt_text(hexblock, FSPUBLIC)
+                s.send(block)
+                block = file_f.read(1024)
+                blockCounter += len(block)
+            file_f.close()
+            s.close()           
+            # s.send(self.data)
+            print "RSA FILETRANSFER COMPLETE"           
 
 	def stop(self):
 		print "Trying to stop thread "
