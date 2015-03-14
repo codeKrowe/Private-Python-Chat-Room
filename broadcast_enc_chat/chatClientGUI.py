@@ -50,23 +50,31 @@ class ChatRoomFrame(wx.Frame):
         self.ctrl = wx.TextCtrl(self, style=wx.TE_PROCESS_ENTER, size=(300, 25))
 
         
-
+        # Create a Shared Memory manager to share object between threads
         self.manager = Manager()
         self.Shared_Mem_Dictionary = self.manager.dict()
+        #creat uniuqe Command code that the system can recognise and ititate actions based on
+        #such as file transmission 
         self.filetxID = "6DCC655077693A5E1ED5857314A0F96D"
         self.filetxID_Final = "2D56DE9597CFF43DD5C1335D509517C9"
         self.init_File_Server_mode = False
         self.Shared_Mem_Dictionary["p2p_dest"]= 0
+        #THE InterProcess Thread - The Main READING THREAD for the chat Client
+        #Messages are passed through here 
+        #Checks for "Custom Commands" are also performed
         self.IPC = IPC_Read(self.client, self.text_send , self.ctrl, self)
+        #create a new READING THREAD with a NEW SOSCKET to bind to
        	self.newSocketRead = None#P2P_READ()
-
-
         sizer.Add(self.text_send, 5, wx.EXPAND)
         sizer.Add(self.ctrl, 0, wx.EXPAND)
         self.SetSizer(sizer)
         self.ctrl.Bind(wx.EVT_TEXT_ENTER, self.onSend)
+        #FLAG for LISTING connected Cleints from the server and have the server
+        #build this list and retunr it to "this" cleint instance
         self.l = False
         self.fileServerMode = False
+        #Encrytion mode to use in filetansfer mode (RSA = 2) (AES = 1)
+
         self.fileTransferEncryption = 1
 
 
@@ -78,13 +86,18 @@ class ChatRoomFrame(wx.Frame):
         sleep(0.1)
         print "************New Socket Binding************"
         print self.newSocketRead.get_address()[1]
+        #Attach COMMAND CODE for FILETRANSFER SERVER setup complete
+        #gets the client to start a FILETX send Thread when it recieves this 
+        #message ( also attached the new port to the message so the client can use the 
+        #address)
         data = "2D56DE9597CFF43DD5C1335D509517C9:" + str(self.newSocketRead.get_address()[1])
+        #encypt the data
         data = self.client.a.enc_str(str(data))
         # True for AES, False for RSA
         filetx = True
         dictobj = {'src_port' : self.client.client_src_port, "data" : data, "list": self.l,\
          "newSock": self.newSocketRead.get_address()[1], "tx": filetx, "p2p_port":p2p_port, "FTX_ENC" :self.fileTransferEncryption}
-
+        #serialize the data
         pickdump = pickle.dumps(dictobj)
         # concatente serialized message with hash
         hashStr = self.client.md5_crypt.hashStringENC(pickdump)
@@ -95,6 +108,7 @@ class ChatRoomFrame(wx.Frame):
             self.client.client.send(finalmessage)
         self.init_File_Server_mode == False
 
+    '''standard send code used by specific funtions'''
     def onSend(self, event):
         def standard_send(data):
             data = self.client.a.enc_str(str(data))
@@ -116,13 +130,18 @@ class ChatRoomFrame(wx.Frame):
         try:
             # Get Text Entered
             data = self.ctrl.GetValue()
+
+            '''TEXT COMMAND INPUTS LIKE IN IRC'''
             # Display the text just entered by client.
             if data == "<list>":
             	self.text_send.AppendText("\n" + t() + data + "\n")
                 self.ctrl.SetValue("")
                 self.l = True
                 standard_send(data)
-                # True for AES, False for RSA
+
+            # start a HANDSHAKE with another client 
+            # routing through the server to a destination client
+            # inserts a COMMAND CODE to the message
             elif data[:9] == "<init_tx>":
             	self.text_send.AppendText("\n" + t() + data + "\n")
                 data = self.filetxID +":" +data[10:]# + "-" +str(self.client.client_src_port)
@@ -130,20 +149,13 @@ class ChatRoomFrame(wx.Frame):
                 standard_send(data)
                 self.ctrl.SetValue("")
 
-            # Check if data has the initiate file transfer HEX code
-            # and a destination port
-            elif self.filetxID == data[:32]:
-                data = data[:32] +":" +data[33:]# + "-" +str(self.client.client_src_port)
-                print "data", data
-                standard_send(data)
-                self.ctrl.SetValue("")
-
-
+            # lists the port of this instance to the chat window
             elif data == "<myport>":
                 print "this port is :", self.client.client_src_port
                 self.text_send.AppendText("\n" + t() + "this port is :" + str(self.client.client_src_port) + "\n")
                 self.ctrl.SetValue("")
 
+            #changes the filetransfer encyption mode globally
             elif data == "<rsa>":
             	self.text_send.AppendText("\n" + t() + "Entering RSA MODE" + "\n")
             	self.fileTransferEncryption = 2
@@ -157,20 +169,23 @@ class ChatRoomFrame(wx.Frame):
             	dat ="<Entering AES MODE>"
             	standard_send(dat)
             	self.ctrl.SetValue("")
-            # elif data == "<send>":
-            #     d2 = "Testing Sending from second Thread - new Socket"
-            #     port = 50883
-            #     p2p_send = P2P_SEND(port, d2)
 
+            # code for a standard message send
             else:
+                #append the message to chatwindows with timestamp
                 self.text_send.AppendText("\n" + t() + data + "\n")
+                #clear the submit box
                 self.ctrl.SetValue("")
+                #encypt the data
                 data = self.client.a.enc_str(str(data))
+                # create the packet
                 dictobj = {'src_port' : self.client.client_src_port, 'data' : data, "list": self.l, "tx":False , "p2p_port":0\
                 ,"newSock": 0, "FTX_ENC" :self.fileTransferEncryption}
+                #serialise it
                 pickdump = pickle.dumps(dictobj)
                 # concatente serialized message with hash
                 hashStr = self.client.md5_crypt.hashStringENC(pickdump)
+                #make the final message 
                 finalmessage = pickdump + hashStr
                 if len(finalmessage) > 1024:
                     print "message too large for recieve buffer"
@@ -253,6 +268,7 @@ class MainFrame(wx.Frame):
 
 
 class IPC_Read(Thread):
+    """Main Socket Reading Thread for the client"""
     def __init__(self, client, text_send, ctrl, caller):
         """Initialize"""
         Thread.__init__(self)
@@ -264,26 +280,28 @@ class IPC_Read(Thread):
 
     def run(self):
         while True:
+            #recieve data
             data = self.client.client.recv(1024)
             if not data: sys.exit(0)
-            print "***************************************"
-            # print "Recv Encypted Broadcast:", data
+            #deserialise the data
             packet = pickle.loads(data)
             data = packet["data"]
+            #get the source port of the "packet"
             src_port = packet["src_port"]
 
+            print "MODE IS CURRENTLY", self.caller.fileTransferEncryption
+
+            #set the Filetrasfer mode
             if packet["FTX_ENC"] == 2:
-            	self.fileTransferEncryption = 2
-            	print "***********************-setting RSA Mode-***************************"
-
+            	self.caller.fileTransferEncryption = 2
             elif packet["FTX_ENC"] == 1:
-            	self.fileTransferEncryption = 1
-            	print "***********************-setting AES Mode-***************************"
-
+            	self.caller.fileTransferEncryption = 1
+            #decypt the data
             data = self.client.a.dec_str(data)
-
-            print "lenght of recived packet = ", len(data)
-
+            #Check for COMMAND to start this instance as a SERVER
+            #if command exists take Source port and pass it and create the
+            #P2P_SEND thread, which will bind to a new socket and 
+            #send the new PORT back to the client that iniated the request
             if (len(data) > 32) and data[:32] == self.caller.filetxID and int(data[33:]) == int(self.client.client_src_port):
                 self.caller.init_File_Server_mode = True
                 # dst_p2p_port = data[33:]
@@ -291,17 +309,21 @@ class IPC_Read(Thread):
                 self.caller.bind_to_new(int(src_port))
                 print "value change shared Shared_Mem_Dictionary"
             print "Decrypting:", data
-
+            #if the message has the SERVER SETUP COMPLETE SO SEND COMMAND
+            #this will initate a P2P new sending THREAD that will start the file transfer
             if (len(data) > 32) and data[:32] == self.caller.filetxID_Final:
             	newFileServerSocketAddress = int(data[33:])
             	print "Got the new Server Socket - Returned From Server"
             	print newFileServerSocketAddress
             	d2 = "filetx from second Thread - Client!!!!!!!!!!!!!!!!!!!!!!!!!"
-            	p2p_send = P2P_SEND(newFileServerSocketAddress, d2)
-
+            	p2p_send = P2P_SEND(newFileServerSocketAddress, d2, self.caller.fileTransferEncryption)
+            #append recieved messages to the GUI chat window
             self.text_send.AppendText("\n" + t() + data + "\n")
 
 
+"""PEER TO PEER Read Thread
+Binds to new Socket, waits for client to connect once it recieves the new port address
+(calling funtion sends this port back to the initiating client)"""
 class P2P_READ(Thread):
 	def __init__(self, mode):
 		Thread.__init__(self)
@@ -318,39 +340,47 @@ class P2P_READ(Thread):
 		self.newReadSocketAddress = newSocketAddress
 		# print newSocketAddress
 		s.listen(1)
-		print "second socket exec"
+		print "@@@@@@@@@@@@@@@@@@@@@@@@-SECOND SOCKET CREATED-@@@@@@@@@@@@@@@@@@@@@@"
 		self.socket = s
 		# self.socket.listen(0)
 		sock, addr = self.socket.accept()
 		data = sock.recv(1024)
 		print data
 		sock.close()
-		print "socket Closed"
-
+		print "@@@@@@@@@@@@@@@@@@@@@@@ new socket closed @@@@@@@@@@@@@@@@@@@@@@@@@@@@"
+    #termiate this thread once it has been used
 	def stop(self):
 		print "Trying to stop thread "
 		if self.process is not None:
 			self.process.terminate()
 			self.process = None
-
+    #return the new port so that it can be send back to the client that initiated the handshake
 	def get_address(self):
 		return self.newReadSocketAddress
 
 
 class P2P_SEND(Thread):
-	def __init__(self, dst_port, data):
-		Thread.__init__(self)
-		self.data = data
-		self.dst_port = dst_port
-		self.start()
-		self.process = None
+    def __init__(self, dst_port, data, mode):
+        Thread.__init__(self)
+        self.data = data
+        self.dst_port = dst_port
+        self.mode = mode
+        self.start()
+        self.process = None
 
-	def run(self):
-		s = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
-		s.connect(('localhost', self.dst_port))	
-		s.send(self.data)
-		print "tx complete"
-		s.close()
+    def run(self):
+        if self.mode == 1:
+            s = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
+            s.connect(('localhost', self.dst_port))	
+            s.send(self.data)
+            print "AES FILETRANSFER COMPLETE"
+            s.close()
+        if self.mode == 2:
+            s = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
+            s.connect(('localhost', self.dst_port)) 
+            s.send(self.data)
+            print "RSA FILETRANSFER COMPLETE"
+            s.close()            
 
 	def stop(self):
 		print "Trying to stop thread "
