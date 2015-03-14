@@ -325,38 +325,48 @@ class IPC_Read(Thread):
 Binds to new Socket, waits for client to connect once it recieves the new port address
 (calling funtion sends this port back to the initiating client)"""
 class P2P_READ(Thread):
-	def __init__(self, mode):
-		Thread.__init__(self)
-		self.socket = None
-		self.newReadSocketAddress = None
-		self.mode = mode
-		self.process = None
-		self.start()
+    def __init__(self, mode):
+        Thread.__init__(self)
+        self.socket = None
+        self.newReadSocketAddress = None
+        self.mode = mode
+        self.process = None
+        self.start()
 
-	def run(self):
-		s = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
-		s.bind(('localhost', 0))
-		newSocketAddress = s.getsockname()
-		self.newReadSocketAddress = newSocketAddress
-		# print newSocketAddress
-		s.listen(1)
-		print "@@@@@@@@@@@@@@@@@@@@@@@@-SECOND SOCKET CREATED-@@@@@@@@@@@@@@@@@@@@@@"
-		self.socket = s
-		# self.socket.listen(0)
-		sock, addr = self.socket.accept()
-		data = sock.recv(1024)
-		print data
-		sock.close()
-		print "@@@@@@@@@@@@@@@@@@@@@@@ new socket closed @@@@@@@@@@@@@@@@@@@@@@@@@@@@"
+    def run(self):
+        s = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
+        s.bind(('localhost', 0))
+        newSocketAddress = s.getsockname()
+        self.newReadSocketAddress = newSocketAddress
+        if self.mode == 1:
+    		s.listen(1)
+    		print "@@@@@@@@@@@@@@@@@@@@@@@@-SECOND SOCKET CREATED AES-@@@@@@@@@@@@@@@@@@@@@@"
+    		self.socket = s
+    		# self.socket.listen(0)
+    		sock, addr = self.socket.accept()
+    		data = sock.recv(1024)
+    		print data
+    		sock.close()
+    		print "@@@@@@@@@@@@@@@@@@@@@@@ new socket closed @@@@@@@@@@@@@@@@@@@@@@@@@@@@"
+        if self.mode == 2:
+            s.listen(1)
+            print "@@@@@@@@@@@@@@@@@@@@@@@@-SECOND SOCKET CREATED RSA-@@@@@@@@@@@@@@@@@@@@@@"
+            self.socket = s
+            # self.socket.listen(0)
+            sock, addr = self.socket.accept()
+            data = sock.recv(1024)
+            print data
+            sock.close()
+            print "@@@@@@@@@@@@@@@@@@@@@@@ new socket closed @@@@@@@@@@@@@@@@@@@@@@@@@@@@"            
     #termiate this thread once it has been used
-	def stop(self):
-		print "Trying to stop thread "
-		if self.process is not None:
-			self.process.terminate()
-			self.process = None
+    def stop(self):
+        print "Trying to stop thread "
+        if self.process is not None:
+            self.process.terminate()
+            self.process = None
     #return the new port so that it can be send back to the client that initiated the handshake
-	def get_address(self):
-		return self.newReadSocketAddress
+    def get_address(self):
+        return self.newReadSocketAddress
 
 
 class P2P_SEND(Thread):
