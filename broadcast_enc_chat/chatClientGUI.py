@@ -319,7 +319,11 @@ class IPC_Read(Thread):
             	d2 = "filetx from second Thread - Client!!!!!!!!!!!!!!!!!!!!!!!!!"
             	p2p_send = P2P_SEND(newFileServerSocketAddress, d2, self.caller.fileTransferEncryption)
             #append recieved messages to the GUI chat window
-            self.text_send.AppendText("\n" + t() + data + "\n")
+            # using wx Callafter to limit the errors introduced in OSX 
+            # caused by accessing the same object in multiplethreads
+            # (stange that it only crashes in osx - windows and linux were unaffected)
+            wx.CallAfter(self.text_send.AppendText, "\n" + t() + data + "\n")
+            # self.text_send.AppendText("\n" + t() + data + "\n")
 
 
 """PEER TO PEER Read Thread
