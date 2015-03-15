@@ -322,6 +322,8 @@ class IPC_Read(Thread):
             # using wx Callafter to limit the errors introduced in OSX 
             # caused by accessing the same object in multiplethreads
             # (stange that it only crashes in osx - windows and linux were unaffected)
+            # CallAfter or CallLater is used to schedule a function to be called on the main UI thread
+            # (with the actual UI-changing code inside that function
             wx.CallAfter(self.text_send.AppendText, "\n" + t() + data + "\n")
             # self.text_send.AppendText("\n" + t() + data + "\n")
 
