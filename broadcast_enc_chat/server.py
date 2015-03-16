@@ -62,7 +62,7 @@ class RemoteClient(asyncore.dispatcher):
         self.address = address
         #list-like container with fast appends and pops on either end
         self.outQ = collections.deque()
-    
+
     def handle_close(self):
         self.close()
 
@@ -101,7 +101,7 @@ class RemoteClient(asyncore.dispatcher):
     # returning always true (as will be the case when this is not overridden)
     # will cause 100% Cpu
     def writable(self):
-        return bool(self.outQ)        
+        return bool(self.outQ)
 
 class Chatroom(asyncore.dispatcher):
         #asyncore dispatcher listening on localhost random socket
@@ -283,7 +283,7 @@ class Chatroom(asyncore.dispatcher):
 
     def broadcast(self, message):
 
-        # Weakness here as the only part of the payload encypted is the 
+        # Weakness here as the only part of the payload encypted is the
         # data string
 
     	# broadcasts messages to all sockets that are connected
@@ -307,7 +307,13 @@ class Chatroom(asyncore.dispatcher):
             mode = dictObj["FTX_ENC"]
 
             # IF a <list> command (message) is sent then
-            # send back a string of connected ports 
+            # send back a string of connected ports
+
+            ##
+            import json
+            import logging
+            connected_ports = []
+            ##
             if dictObj["list"] == True:
                 connlist = "Conn_list "
                 for remote_client in self.remote_clients:
@@ -315,10 +321,19 @@ class Chatroom(asyncore.dispatcher):
                         connlist = connlist + " : " + str(remote_client.get_address()[1]) + " <-You "
                     else:
                         connlist = connlist + " : " + str(remote_client.get_address()[1])
-                connlist = aesObj.enc_str(connlist)      
+                        logging.warning("connected ports : " + str(remote_client.get_address()[1]))
+                        print connected_ports
+                        connected_ports.append(str(remote_client.get_address()[1]))
+                logging.warning("connected ports : " + str(connected_ports))
+                connected_ports = json.dumps(connected_ports)
+                connected_ports = aesObj.enc_str(connected_ports)
+                connected_ports = {"data" : connected_ports, "src_port": src_port, "FTX_ENC": mode}
+                connected_ports = pickle.dumps(connected_ports)
+
+                connlist = aesObj.enc_str(connlist)
                 connlist = {"data" : connlist, "src_port": src_port, "FTX_ENC": mode}
                 connlist = pickle.dumps(connlist)
-                
+
             packet = {"data" : src_data, "src_port": src_port, "FTX_ENC": mode}
             src_data = pickle.dumps(packet)
 
@@ -338,6 +353,7 @@ class Chatroom(asyncore.dispatcher):
                     remote_client.send(src_data)
                 if remote_client.get_address()[1] == src_port and dictObj["list"] == True:
                     remote_client.send(connlist)
+                    remote_client.send(connected_ports)
                 if remote_client.get_address()[1] == int(dictObj["p2p_port"]) and dictObj["tx"] == True:
                     remote_client.send(src_data)
         except Exception, e:
