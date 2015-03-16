@@ -43,16 +43,27 @@ class ChatRoomFrame(wx.Frame):
         # Create a messages display box
         self.text_send = wx.TextCtrl(self, style=wx.TE_MULTILINE | wx.TE_LEFT | wx.BORDER_NONE | wx.TE_READONLY)
         self.ctrl = wx.TextCtrl(self, style=wx.TE_PROCESS_ENTER, size=(300, 25))
+        self.sendFile_Btn = wx.Button(self, 1, 'Send File')
 
         self.IPC = IPC_Read(self.client, self.text_send , self.ctrl)
 
        	self.newSocketRead = None#P2P_READ()
 
-
         sizer.Add(self.text_send, 5, wx.EXPAND)
         sizer.Add(self.ctrl, 0, wx.EXPAND)
+        sizer.Add(self.sendFile_Btn, 0, wx.EXPAND)
+
         self.SetSizer(sizer)
+
         self.ctrl.Bind(wx.EVT_TEXT_ENTER, self.onSend)
+        self.sendFile_Btn.Bind(wx.EVT_BUTTON, self.sendFile)
+
+    def sendFile(self, event):
+        """ Send File to Client """
+
+        # Create a new panel
+        send_file = SendTo()
+        send_file.Show()
 
     def onSend(self, event):
         """
@@ -111,6 +122,46 @@ class ChatRoomFrame(wx.Frame):
             print traceback.format_exc()
             print sys.exc_info()[0]
 
+class SendTo(wx.Frame):
+    """ Choose who to send file to """
+
+    def __init__(self):
+        wx.Frame.__init__(self, None, -1, "Select Recipient", size=(250,150))
+        choose = wx.StaticText(self, label="Choose Recipient:")
+
+        # need to get list of connected clients?
+        clients = ['12345', '98765', '14785', '25896', '00000']
+
+        # add drop down list of connected clients
+        self.client_list = wx.ComboBox(self, -1, choices=clients, style=wx.CB_READONLY)
+        self.client_list.Centre()
+
+
+        btn = wx.Button(self, label="Next")
+        btn.Bind(wx.EVT_BUTTON, self.onNext)
+
+        # add box to enter destination port
+        # or do it behind the scenes
+
+        sizer = wx.BoxSizer(wx.VERTICAL)
+        flags = wx.ALL|wx.CENTER
+
+        sizer.Add(choose, 0, flags, 5)
+        sizer.Add(self.client_list, 0, flags, 5)
+        sizer.Add(btn, 0, flags, 5)
+        self.SetSizer(sizer)
+
+        self.Bind(wx.EVT_COMBOBOX, self.OnSelect)
+
+    def OnSelect(self, event):
+        # print selected
+        print self.client_list.GetValue()
+
+    def onNext(self, event):
+        """ Choose RSA or AES in next panel """
+        self.Hide()
+        choose_enc_type = FilePanel()
+        choose_enc_type.Show()
 
 class DirectConnection(wx.Frame):
     """"""
@@ -187,6 +238,64 @@ class MainFrame(wx.Frame):
         wx.Frame.__init__(self, None, -1, "Chat Client")
         panel = MainPanel(self)
 
+class FilePanel(wx.Frame):
+    """ Panel to Select Transfer Mode """
+
+    #----------------------------------------------------------------------
+    def __init__(self):
+        wx.Frame.__init__(self, None, -1, "Send File", size=(250,150))
+        self.choose = wx.StaticText(self, label="Choose File Transfer Mode:")
+        self.rsa_radio = wx.RadioButton(self, label="RSA", style = wx.RB_GROUP)
+        self.aes_radio = wx.RadioButton(self, label="AES")
+
+        btn = wx.Button(self, label="Next")
+        btn.Bind(wx.EVT_BUTTON, self.onNext)
+
+        sizer = wx.BoxSizer(wx.VERTICAL)
+        flags = wx.ALL|wx.CENTER
+
+        sizer.Add(self.choose, 0, flags, 5)
+        sizer.Add(self.rsa_radio, 0, flags, 5)
+        sizer.Add(self.aes_radio, 0, flags, 5)
+        sizer.Add(btn, 0, flags, 5)
+
+        self.SetSizer(sizer)
+
+    #----------------------------------------------------------------------
+    def onNext(self, event):
+        """"""
+        print "First radioBtn = ", self.rsa_radio.GetValue()
+        print "Second radioBtn = ", self.aes_radio.GetValue()
+        self.Hide()
+        choose_file = chooseFilePanel()
+        choose_file.Show()
+
+class chooseFilePanel(wx.Frame):
+    """ Choose the file to send """
+
+    def __init__(self):
+        wx.Frame.__init__(self, None, -1, "Select File", size=(250,150))
+        self.choose = wx.StaticText(self, label="Select File to Send:")
+        btn = wx.Button(self, label="Next", pos=(100,100))
+        btn.Bind(wx.EVT_BUTTON, self.onNext)
+
+        choose_file = wx.FilePickerCtrl(self, pos=(125,100))
+
+        sizer = wx.BoxSizer(wx.VERTICAL)
+        flags = wx.ALL|wx.CENTER
+
+        sizer.Add(self.choose, 0, flags, 5)
+        sizer.Add(btn, 0, flags, 5)
+        sizer.Add(choose_file, 0, flags, 5)
+
+        self.SetSizer(sizer)
+
+    def onNext(self, event):
+        """ Send File to recipient"""
+        pass
+        # at this point all file transfer settings have been entered.
+        # actually send the file from here.
+
 
 class IPC_Read(Thread):
     def __init__(self, client, text_send, ctrl):
@@ -244,7 +353,7 @@ class P2P_SEND(Thread):
 
 	def run(self):
 		s = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
-		s.connect(('localhost', self.dst_port))	
+		s.connect(('localhost', self.dst_port))
 		s.send(self.data)
 		print "tx complete"
 		s.close()
