@@ -13,7 +13,7 @@ import random
 
 # Hard Coded port for testing
 # MUST BE CHANGED TO WHATEVER PORT SERVER SETS
-PORT=53609
+PORT=53405
 HOST = 'localhost'
 BUFSIZE = 1024
 ADDR = (HOST, PORT)
@@ -147,6 +147,8 @@ class Client:
                 print "serverSessionKey", sk
                 print "setting serverSessionKey"
                 self.a.set_sessionkey(sk)
+                iv = self.a.getCrypt().hashStringENC(sk)
+                self.a.setIv(iv)
             else:
                 print "Integrity Mismatch"
                 client.close()

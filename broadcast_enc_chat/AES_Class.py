@@ -147,5 +147,5 @@ class AESClass:
 			return self.ivHex
 
 	def setIv(self, iv):
-		ivHex = iv
+		self.ivHex = iv
 		return True
