@@ -147,6 +147,8 @@ class Client:
                 print "serverSessionKey", sk
                 print "setting serverSessionKey"
                 self.a.set_sessionkey(sk)
+                iv = self.a.getCrypt().hashStringENC(sk)
+                self.a.setIv(iv)
             else:
                 print "Integrity Mismatch"
                 client.close()

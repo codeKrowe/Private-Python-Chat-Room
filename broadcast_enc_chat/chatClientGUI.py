@@ -20,6 +20,7 @@ from client import Client
 import traceback
 from multiprocessing import Process, Value, Array, Manager
 import binascii
+import copy
 
 # Commands FileTX
 # <list>                              - gets list connected scockets
@@ -65,7 +66,12 @@ class ChatRoomFrame(wx.Frame):
         #THE InterProcess Thread - The Main READING THREAD for the chat Client
         #Messages are passed through here
         #Checks for "Custom Commands" are also performed
-        self.IPC = IPC_Read(self.client, self.text_send , self.ctrl, self)
+
+        #Also make a shallow copy of the AES Object
+        #to stop of possible simulatnous access issues
+        #and saves having to set it up again
+        newAes = copy.copy(self.client.a)
+        self.IPC = IPC_Read(self.client, self.text_send , self.ctrl, self, newAes)
         #create a new READING THREAD with a NEW SOSCKET to bind to
        	self.newSocketRead = None#P2P_READ()
 
@@ -96,10 +102,14 @@ class ChatRoomFrame(wx.Frame):
 
 
     def bind_to_new(self, p2p_port):
+        newaes = copy.copy(self.client.a)
     	try:
-        	self.newSocketRead = P2P_READ(self.fileTransferEncryption, self.client.public_key, self.client.private_key)
-        except:
-        	print "An Erro Binding a new socket in a new thread"
+        	self.newSocketRead = P2P_READ(self.fileTransferEncryption, self.client.public_key, self.client.private_key, newaes)
+        except Exception, err:
+            print "Bind method error"
+            print traceback.format_exc()
+            print sys.exc_info()[0]
+            print "An Erro Binding a new socket in a new thread"
         sleep(0.1)
         print "************New Socket Binding************"
         print self.newSocketRead.get_address()[1]
@@ -388,13 +398,14 @@ class chooseFilePanel(wx.Frame):
 
 class IPC_Read(Thread):
     """Main Socket Reading Thread for the client"""
-    def __init__(self, client, text_send, ctrl, caller):
+    def __init__(self, client, text_send, ctrl, caller, aes):
         """Initialize"""
         Thread.__init__(self)
         self.client = client
         self.caller = caller
         self.text_send = text_send
         self.ctrl = ctrl
+        self.aes = aes
         self.start()
 
     def run(self):
@@ -435,7 +446,7 @@ class IPC_Read(Thread):
             	print "Got the new Server Socket - Returned From Server"
             	print newFileServerSocketAddress
             	d2 = "filetx from second Thread - Client!!!!!!!!!!!!!!!!!!!!!!!!!"
-            	p2p_send = P2P_SEND(newFileServerSocketAddress, d2, self.caller.fileTransferEncryption)
+            	p2p_send = P2P_SEND(newFileServerSocketAddress, d2, self.caller.fileTransferEncryption , self.aes)
             #append recieved messages to the GUI chat window
             # using wx Callafter to limit the errors introduced in OSX
             # caused by accessing the same object in multiplethreads
@@ -450,12 +461,13 @@ class IPC_Read(Thread):
 Binds to new Socket, waits for client to connect once it recieves the new port address
 (calling funtion sends this port back to the initiating client)"""
 class P2P_READ(Thread):
-    def __init__(self, mode, public_key, private_key):
+    def __init__(self, mode, public_key, private_key, aes):
         Thread.__init__(self)
         self.socket = None
         self.newReadSocketAddress = None
         self.mode = mode
         self.process = None
+        self.aes = aes
         self.public_key = public_key
         self.private_key = private_key
         self.start()
@@ -467,14 +479,23 @@ class P2P_READ(Thread):
         newSocketAddress = s.getsockname()
         self.newReadSocketAddress = newSocketAddress
 
-
         if self.mode == 1:
             s.listen(1)
             print "@@@@@@@@@@@@@@@@@@@@@@@@-SECOND SOCKET CREATED AES-@@@@@@@@@@@@@@@@@@@@@@"
             self.socket = s
             sock, addr = self.socket.accept()
-            data = sock.recv(1024)
-            print data
+            file_f = open("Rec_kali.jpg",'wb') #open in binary
+            block = sock.recv(2752)
+            blockCounter = len(block)
+            while (block):
+                    print "RECIEVED", blockCounter, "Bytes"
+                    block=self.aes.dec_str(block)
+                    unhexblock=binascii.unhexlify(block)
+                    file_f.write(unhexblock)
+                    block=sock.recv(2752)
+                    blockCounter += len(block)
+            print "!!!!!!!!!!!!!!!!!!  FILETRANSFER COMPLETED !!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
+            file_f.close()
             sock.close()
             print "@@@@@@@@@@@@@@@@@@@@@@@ new socket closed @@@@@@@@@@@@@@@@@@@@@@@@@@@@"
 
@@ -516,22 +537,39 @@ class P2P_READ(Thread):
 
 class P2P_SEND(Thread):
 
-    def __init__(self, dst_port, data, mode):
+    def __init__(self, dst_port, data, mode, aes):
         Thread.__init__(self)
         self.data = data
         self.filename = "kali_linux.jpg"
         self.dst_port = dst_port
         self.mode = mode
+        self.aes = aes
         self.start()
         self.process = None
 
     def run(self):
+
         if self.mode == 1:
             s = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
             s.connect(('localhost', self.dst_port))
-            s.send(self.data)
+            file_f = open("kali_linux.jpg", "rb")
+            block = file_f.read(1024)
+            filesize = int(os.stat(self.filename).st_size)
+            blockCounter = len(block)
+            while (block):
+                calc = (float(blockCounter)/float(filesize))*float(100)
+                print calc
+                hexblock=binascii.hexlify(block)
+                block = self.aes.enc_str(hexblock)
+                s.send(block)
+                block = file_f.read(1024)
+                blockCounter += len(block)
+            print "file sent"
+            file_f.close()
             print "AES FILETRANSFER COMPLETE"
             s.close()
+
+
         if self.mode == 2:
             rsa = RSAClass()
             s = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
