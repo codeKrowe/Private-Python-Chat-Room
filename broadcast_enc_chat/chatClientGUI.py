@@ -42,17 +42,6 @@ class ChatRoomFrame(wx.Frame):
         self.client.setUpClient()
         # starts a InterProcess Communication Thread
 
-        wx.Frame.__init__(self, None, -1, "Chat Room")
-        panel = wx.Panel(self)
-        sizer = wx.BoxSizer(wx.VERTICAL)
-
-        # Create a messages display box
-        self.text_send = wx.TextCtrl(self, style=wx.TE_MULTILINE | wx.TE_LEFT | wx.BORDER_NONE | wx.TE_READONLY)
-        self.ctrl = wx.TextCtrl(self, style=wx.TE_PROCESS_ENTER, size=(300, 25))
-        self.sendFile_Btn = wx.Button(self, 1, 'Send File')
-
-
-
         # Create a Shared Memory manager to share object between threads
         self.manager = Manager()
         self.Shared_Mem_Dictionary = self.manager.dict()
@@ -62,10 +51,21 @@ class ChatRoomFrame(wx.Frame):
         self.filetxID_Final = "2D56DE9597CFF43DD5C1335D509517C9"
         self.init_File_Server_mode = False
         self.Shared_Mem_Dictionary["p2p_dest"]= 0
-        self.Shared_Mem_Dictionary["choices"] = None
+        self.Shared_Mem_Dictionary["choices"] = []
+        self.Shared_Mem_Dictionary["mode"] = 0
         #THE InterProcess Thread - The Main READING THREAD for the chat Client
         #Messages are passed through here
         #Checks for "Custom Commands" are also performed
+
+
+        wx.Frame.__init__(self, None, -1, "Chat Room")
+        panel = wx.Panel(self)
+        sizer = wx.BoxSizer(wx.VERTICAL)
+
+        # Create a messages display box
+        self.text_send = wx.TextCtrl(self, style=wx.TE_MULTILINE | wx.TE_LEFT | wx.BORDER_NONE | wx.TE_READONLY)
+        self.ctrl = wx.TextCtrl(self, style=wx.TE_PROCESS_ENTER, size=(300, 25))
+        self.sendFile_Btn = wx.Button(self, 1, 'Send File')
 
         #Also make a shallow copy of the AES Object
         #to stop of possible simulatnous access issues
@@ -74,15 +74,38 @@ class ChatRoomFrame(wx.Frame):
         self.IPC = IPC_Read(self.client, self.text_send , self.ctrl, self, newAes, self.Shared_Mem_Dictionary)
         #create a new READING THREAD with a NEW SOSCKET to bind to
        	self.newSocketRead = None#P2P_READ()
+        # btn = wx.Button(self, label="Next", pos=(100,100))
+        # btn.Bind(wx.EVT_BUTTON, self.onNext)
+
+        self.choose_file = wx.FilePickerCtrl(self)
+        clients = self.Shared_Mem_Dictionary["choices"]
+
+        # add port entry box
+        self.port = wx.StaticText(self, label="Enter a Port: ")
+        self.portText = wx.TextCtrl(self, value="")
+
+        self.rsa_radio = wx.RadioButton(self, label="RSA", style = wx.RB_GROUP)
+        self.aes_radio = wx.RadioButton(self, label="AES")
+
+        btn = wx.Button(self, label="Set File Transfer Mode")
 
         sizer.Add(self.text_send, 5, wx.EXPAND)
         sizer.Add(self.ctrl, 0, wx.EXPAND)
         sizer.Add(self.sendFile_Btn, 0, wx.EXPAND)
+        sizer.Add(self.choose_file, 0, wx.EXPAND)
+        sizer.Add(self.rsa_radio, 0, wx.EXPAND)
+        sizer.Add(self.aes_radio, 0, wx.EXPAND)
+        sizer.Add(self.port, 0, wx.EXPAND)
+        sizer.Add(self.portText, 0, wx.EXPAND)
+        sizer.Add(btn, 0, wx.EXPAND)
 
         self.SetSizer(sizer)
 
         self.ctrl.Bind(wx.EVT_TEXT_ENTER, self.onSend)
         self.sendFile_Btn.Bind(wx.EVT_BUTTON, self.sendFile)
+        btn.Bind(wx.EVT_BUTTON, self.onSet)
+
+
         #FLAG for LISTING connected Cleints from the server and have the server
         #build this list and retunr it to "this" cleint instance
         self.l = False
@@ -93,10 +116,24 @@ class ChatRoomFrame(wx.Frame):
 
     def sendFile(self, event):
         """ Send File to Client """
-        # Create a new panel
-        send_file = SendTo()
-        send_file.Show()
+        file_path = self.choose_file.GetPath()
+        port = self.portText.GetValue()
 
+        print "888888888888888888888888888888888888888888888888888888888888"
+        print file_path
+        print port
+        print "888888888888888888888888888888888888888888888888888888888888"
+
+
+    def onSet(self,event):
+        if self.rsa_radio.GetValue():
+            self.fileTransferEncryption = 2
+            dat ="<Entering RSA MODE>"
+            self.standard_send_to(dat)
+        if self.aes_radio.GetValue():
+            dat ="<Entering AES MODE>"
+            self.standard_send_to(dat)
+            self.fileTransferEncryption = 1
 
     def bind_to_new(self, p2p_port):
         newaes = copy.copy(self.client.a)
@@ -134,6 +171,21 @@ class ChatRoomFrame(wx.Frame):
 
     '''standard send code used by specific funtions'''
 
+
+
+    def standard_send_to(self, data):
+        data = self.client.a.enc_str(str(data))
+        dictobj = {'src_port' : self.client.client_src_port, 'data' : data, "list": self.l, "tx": False\
+        ,"p2p_port":0, "newSock": 0, "FTX_ENC" :self.fileTransferEncryption}
+        pickdump = pickle.dumps(dictobj)
+        # concatente serialized message with hash
+        hashStr = self.client.md5_crypt.hashStringENC(pickdump)
+        finalmessage = pickdump + hashStr
+        if len(finalmessage) > 1024:
+            print "message too large for recieve buffer"
+        else:
+            self.client.client.send(finalmessage)
+            self.l = False
 
     def onSend(self, event):
         def standard_send(data):
@@ -225,77 +277,7 @@ class ChatRoomFrame(wx.Frame):
             print traceback.format_exc()
             print sys.exc_info()[0]
 
-class SendTo(wx.Frame):
-    """ Choose who to send file to """
 
-    def __init__(self):
-        wx.Frame.__init__(self, None, -1, "Select Recipient", size=(250,150))
-        choose = wx.StaticText(self, label="Choose Recipient:")
-
-        # need to get list of connected clients?
-        clients = ['12345', '98765', '14785', '25896', '00000']
-
-        # add drop down list of connected clients
-        self.client_list = wx.ComboBox(self, -1, choices=clients, style=wx.CB_READONLY)
-        self.client_list.Centre()
-
-
-        btn = wx.Button(self, label="Next")
-        btn.Bind(wx.EVT_BUTTON, self.onNext)
-
-        # add box to enter destination port
-        # or do it behind the scenes
-
-        sizer = wx.BoxSizer(wx.VERTICAL)
-        flags = wx.ALL|wx.CENTER
-
-        sizer.Add(choose, 0, flags, 5)
-        sizer.Add(self.client_list, 0, flags, 5)
-        sizer.Add(btn, 0, flags, 5)
-        self.SetSizer(sizer)
-
-        self.Bind(wx.EVT_COMBOBOX, self.OnSelect)
-
-    def OnSelect(self, event):
-        # print selected
-        print self.client_list.GetValue()
-
-    def onNext(self, event):
-        """ Choose RSA or AES in next panel """
-        self.Hide()
-        choose_enc_type = FilePanel()
-        choose_enc_type.Show()
-
-class DirectConnection(wx.Frame):
-    """"""
-    def __init__(self):
-        """Constructor"""
-        wx.Frame.__init__(self, None, -1, "Connect To Frame")
-        panel = wx.Panel(self)
-
-        self.ipAddr = wx.StaticText(panel, label="Enter an IP Address: ")
-        self.port = wx.StaticText(panel, label="Enter a Port: ")
-        self.ipText = wx.TextCtrl(panel, value="")
-        self.portText = wx.TextCtrl(panel, value="")
-        self.connect_button = wx.Button(panel, label="Connect")
-        self.connect_button.Bind(wx.EVT_BUTTON, self.onConnect)
-
-        sizer = wx.BoxSizer(wx.VERTICAL)
-        flags = wx.ALL|wx.CENTER
-        sizer.Add(self.ipAddr, 0, flags, 5)
-        sizer.Add(self.ipText, 0, flags, 5)
-        sizer.Add(self.port, 0, flags, 5)
-        sizer.Add(self.portText, 0, flags, 5)
-        sizer.Add(self.connect_button, 0, flags, 5)
-        panel.SetSizer(sizer)
-
-    def onConnect(self, event):
-        """
-        Send a message and close frame
-        """
-        pass
-        # TODO - Open a new frame that shows the chat window
-        # TODO - Integrate P2P chat here
 
 class MainPanel(wx.Panel):
     """"""
@@ -306,13 +288,9 @@ class MainPanel(wx.Panel):
         self.frame = parent
         # Add a button to join the chatroom
         self.chat_room_button = wx.Button(self, -1, label="Join Chat Room")
-        # Add a button to connect to someone
-        self.connect_to_button = wx.Button(self, -1, label="Connect To")
         self.chat_room_button.Bind(wx.EVT_BUTTON, self.openChatRoom)
-        self.connect_to_button.Bind(wx.EVT_BUTTON, self.openConnectTo)
         sizer = wx.BoxSizer(wx.VERTICAL)
         sizer.Add(self.chat_room_button, 0, wx.ALL|wx.CENTER, 5)
-        sizer.Add(self.connect_to_button, 0, wx.ALL|wx.CENTER, 5)
         self.SetSizer(sizer)
 
 
@@ -322,76 +300,11 @@ class MainPanel(wx.Panel):
         chat_room = ChatRoomFrame()
         chat_room.Show()
 
-    def openConnectTo(self, event):
-        """ Opens the connect to frame """
-        self.frame.Hide()
-        direct_connection = DirectConnection()
-        direct_connection.Show()
-
 class MainFrame(wx.Frame):
 
     def __init__(self):
         wx.Frame.__init__(self, None, -1, "Chat Client")
         panel = MainPanel(self)
-
-class FilePanel(wx.Frame):
-    """ Panel to Select Transfer Mode """
-
-    #----------------------------------------------------------------------
-    def __init__(self):
-        wx.Frame.__init__(self, None, -1, "Send File", size=(250,150))
-        self.choose = wx.StaticText(self, label="Choose File Transfer Mode:")
-        self.rsa_radio = wx.RadioButton(self, label="RSA", style = wx.RB_GROUP)
-        self.aes_radio = wx.RadioButton(self, label="AES")
-
-        btn = wx.Button(self, label="Next")
-        btn.Bind(wx.EVT_BUTTON, self.onNext)
-
-        sizer = wx.BoxSizer(wx.VERTICAL)
-        flags = wx.ALL|wx.CENTER
-
-        sizer.Add(self.choose, 0, flags, 5)
-        sizer.Add(self.rsa_radio, 0, flags, 5)
-        sizer.Add(self.aes_radio, 0, flags, 5)
-        sizer.Add(btn, 0, flags, 5)
-
-        self.SetSizer(sizer)
-
-    #----------------------------------------------------------------------
-    def onNext(self, event):
-        """"""
-        print "First radioBtn = ", self.rsa_radio.GetValue()
-        print "Second radioBtn = ", self.aes_radio.GetValue()
-        self.Hide()
-        choose_file = chooseFilePanel()
-        choose_file.Show()
-
-class chooseFilePanel(wx.Frame):
-    """ Choose the file to send """
-
-    def __init__(self):
-        wx.Frame.__init__(self, None, -1, "Select File", size=(250,150))
-        self.choose = wx.StaticText(self, label="Select File to Send:")
-        btn = wx.Button(self, label="Next", pos=(100,100))
-        btn.Bind(wx.EVT_BUTTON, self.onNext)
-
-        choose_file = wx.FilePickerCtrl(self, pos=(125,100))
-
-        sizer = wx.BoxSizer(wx.VERTICAL)
-        flags = wx.ALL|wx.CENTER
-
-        sizer.Add(self.choose, 0, flags, 5)
-        sizer.Add(btn, 0, flags, 5)
-        sizer.Add(choose_file, 0, flags, 5)
-
-        self.SetSizer(sizer)
-
-    def onNext(self, event):
-        """ Send File to recipient"""
-        pass
-        # at this point all file transfer settings have been entered.
-        # actually send the file from here.
-
 
 class IPC_Read(Thread):
     """Main Socket Reading Thread for the client"""
@@ -421,7 +334,7 @@ class IPC_Read(Thread):
             if not remoteConnectedClients == None:
                 self.sharedMem["choices"] = remoteConnectedClients
                 print ">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>"
-                print "listing of Client", remoteConnectedClients 
+                print "listing of Client", remoteConnectedClients
                 print "<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<"
             print "MODE IS CURRENTLY", self.caller.fileTransferEncryption
 
