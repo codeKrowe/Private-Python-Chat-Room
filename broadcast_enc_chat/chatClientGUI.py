@@ -44,7 +44,6 @@ class ChatRoomFrame(wx.Frame):
 
         wx.Frame.__init__(self, None, -1, "Chat Room")
         panel = wx.Panel(self)
-
         sizer = wx.BoxSizer(wx.VERTICAL)
 
         # Create a messages display box
@@ -93,12 +92,9 @@ class ChatRoomFrame(wx.Frame):
 
     def sendFile(self, event):
         """ Send File to Client """
-
         # Create a new panel
         send_file = SendTo()
         send_file.Show()
-
-
 
 
     def bind_to_new(self, p2p_port):
@@ -419,6 +415,11 @@ class IPC_Read(Thread):
             #get the source port of the "packet"
             src_port = packet["src_port"]
 
+            remoteConnectedClients = packet["remoteConnectedClients"]
+            if not remoteConnectedClients == None:
+                print ">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>"
+                print "listing of Client", remoteConnectedClients 
+                print "<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<"
             print "MODE IS CURRENTLY", self.caller.fileTransferEncryption
 
             #set the Filetrasfer mode
