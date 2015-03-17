@@ -127,18 +127,17 @@ class ChatRoomFrame(wx.Frame):
 
         port = self.portText.GetValue()
 
-        file_transmisson_cmd = self.filetxID + ":" + str(port)
-
-        self.text_send.AppendText("\n" + t() + ":Filetrasfer Started " + "\n")
-        self.ctrl.SetValue("")
-        self.standard_send_to(file_transmisson_cmd)
-                
-        print "888888888888888888888888888888888888888888888888888888888888"
-        print file_path
-        print port
-        print "888888888888888888888888888888888888888888888888888888888888"
-
-
+        if int(port) == self.client.client_src_port:
+             self.text_send.AppendText("\n" + t() + ":This is Your Port! " + "\n")  
+             self.text_send.AppendText("\n" + t() + ":Try Again " + "\n")                      
+        elif str(port) == "":
+             self.text_send.AppendText("\n" + t() + ":Enter a Destination PORT! " + "\n")
+        else:
+            file_transmisson_cmd = self.filetxID + ":" + str(port)
+            self.text_send.AppendText("\n" + t() + ":Filetrasfer Started " + "\n")
+            self.ctrl.SetValue("")
+            self.standard_send_to(file_transmisson_cmd)
+            
     def onSet(self,event):
         if self.rsa_radio.GetValue():
             self.fileTransferEncryption = 2
