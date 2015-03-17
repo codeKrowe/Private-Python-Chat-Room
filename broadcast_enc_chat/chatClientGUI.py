@@ -38,6 +38,8 @@ class ChatRoomFrame(wx.Frame):
 
     def __init__(self):
         """Constructor"""
+        #default file path
+        self.file_path = "kali_linux.jpg"
         self.client = Client()
         self.client.setUpClient()
         # starts a InterProcess Communication Thread
@@ -53,6 +55,7 @@ class ChatRoomFrame(wx.Frame):
         self.Shared_Mem_Dictionary["p2p_dest"]= 0
         self.Shared_Mem_Dictionary["choices"] = []
         self.Shared_Mem_Dictionary["mode"] = 0
+        self.Shared_Mem_Dictionary["file_path"] = self.file_path
         #THE InterProcess Thread - The Main READING THREAD for the chat Client
         #Messages are passed through here
         #Checks for "Custom Commands" are also performed
@@ -111,14 +114,25 @@ class ChatRoomFrame(wx.Frame):
         self.l = False
         self.fileServerMode = False
         #Encrytion mode to use in filetansfer mode (RSA = 2) (AES = 1)
-
         self.fileTransferEncryption = 1
+
+
 
     def sendFile(self, event):
         """ Send File to Client """
         file_path = self.choose_file.GetPath()
+        #set the file path
+        self.file_path = file_path
+        self.Shared_Mem_Dictionary["file_path"] = str(file_path)
+
         port = self.portText.GetValue()
 
+        file_transmisson_cmd = self.filetxID + ":" + str(port)
+
+        self.text_send.AppendText("\n" + t() + ":Filetrasfer Started " + "\n")
+        self.ctrl.SetValue("")
+        self.standard_send_to(file_transmisson_cmd)
+                
         print "888888888888888888888888888888888888888888888888888888888888"
         print file_path
         print port
@@ -138,7 +152,7 @@ class ChatRoomFrame(wx.Frame):
     def bind_to_new(self, p2p_port):
         newaes = copy.copy(self.client.a)
     	try:
-        	self.newSocketRead = P2P_READ(self.fileTransferEncryption, self.client.public_key, self.client.private_key, newaes)
+        	self.newSocketRead = P2P_READ(self.fileTransferEncryption, self.client.public_key, self.client.private_key, newaes, self.text_send)
         except Exception, err:
             print "Bind method error"
             print traceback.format_exc()
@@ -363,7 +377,7 @@ class IPC_Read(Thread):
             	print "Got the new Server Socket - Returned From Server"
             	print newFileServerSocketAddress
             	d2 = "filetx from second Thread - Client!!!!!!!!!!!!!!!!!!!!!!!!!"
-            	p2p_send = P2P_SEND(newFileServerSocketAddress, d2, self.caller.fileTransferEncryption , self.aes)
+            	p2p_send = P2P_SEND(newFileServerSocketAddress, d2, self.caller.fileTransferEncryption , self.aes, self.sharedMem, self.text_send)
             #append recieved messages to the GUI chat window
             # using wx Callafter to limit the errors introduced in OSX
             # caused by accessing the same object in multiplethreads
@@ -376,15 +390,17 @@ class IPC_Read(Thread):
 
 """PEER TO PEER Read Thread
 Binds to new Socket, waits for client to connect once it recieves the new port address
-(calling funtion sends this port back to the initiating client)"""
+(a called funtion send this port back to the initiating client |get_address()|)"""
 class P2P_READ(Thread):
-    def __init__(self, mode, public_key, private_key, aes):
+    def __init__(self, mode, public_key, private_key, aes,text_send):
         Thread.__init__(self)
         self.socket = None
         self.newReadSocketAddress = None
         self.mode = mode
         self.process = None
         self.aes = aes
+        self.text_send = text_send
+        self.original_file_path = None
         self.public_key = public_key
         self.private_key = private_key
         self.start()
@@ -401,7 +417,16 @@ class P2P_READ(Thread):
             print "@@@@@@@@@@@@@@@@@@@@@@@@-SECOND SOCKET CREATED AES-@@@@@@@@@@@@@@@@@@@@@@"
             self.socket = s
             sock, addr = self.socket.accept()
-            file_f = open("Rec_kali.jpg",'wb') #open in binary
+
+            self.original_file_path = sock.recv(1024)
+            # print "self.original_file_path", self.original_file_path, len(self.original_file_path)
+            unpaddedOriginal = self.original_file_path.strip()
+            print "unpaddedOriginal", unpaddedOriginal, len(unpaddedOriginal)
+            path, filename_ext = os.path.split(unpaddedOriginal)
+            filename, extension = os.path.splitext(filename_ext)
+            filename = filename + "_txCopy" + extension
+
+            file_f = open(filename,'wb') #open in binary
             block = sock.recv(2752)
             blockCounter = len(block)
             while (block):
@@ -411,6 +436,7 @@ class P2P_READ(Thread):
                     file_f.write(unhexblock)
                     block=sock.recv(2752)
                     blockCounter += len(block)
+            wx.CallAfter(self.text_send.AppendText, "\n" + t() + "AES FILETRANSFER RECIEVED" + "\n")
             print "!!!!!!!!!!!!!!!!!!  FILETRANSFER COMPLETED !!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
             file_f.close()
             sock.close()
@@ -423,8 +449,17 @@ class P2P_READ(Thread):
             self.socket = s
             sock, addr = self.socket.accept()
             sock.send(self.public_key)
+
+            self.original_file_path = sock.recv(1024)
+            # print "self.original_file_path", self.original_file_path, len(self.original_file_path)
+            unpaddedOriginal = self.original_file_path.strip()
+            print "unpaddedOriginal", unpaddedOriginal, len(unpaddedOriginal)
+            path, filename_ext = os.path.split(unpaddedOriginal)
+            filename, extension = os.path.splitext(filename_ext)
+            filename = filename + "_txCopy" + extension
+
             rsa = RSAClass()
-            file_f = open("temp.jpg",'wb')
+            file_f = open(filename,'wb')
             # data = sock.recv(1024)
             block=sock.recv(4608)
             #----receiving & decrypting-------
@@ -436,6 +471,7 @@ class P2P_READ(Thread):
                 file_f.write(unhexblock)
                 block=sock.recv(4608)
                 blockCounter += len(block)
+            wx.CallAfter(self.text_send.AppendText, "\n" + t() + "RSA FILETRANSFER RECIEVED" + "\n")
             print "!!!!!!!!!!!!!!!!!!  FILETRANSFER COMPLETED !!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
             file_f.close()
             sock.close()
@@ -454,24 +490,35 @@ class P2P_READ(Thread):
 
 class P2P_SEND(Thread):
 
-    def __init__(self, dst_port, data, mode, aes):
+    def __init__(self, dst_port, data, mode, aes, sharedMem, text_send):
         Thread.__init__(self)
         self.data = data
         self.filename = "kali_linux.jpg"
         self.dst_port = dst_port
         self.mode = mode
         self.aes = aes
+        self.sharedMem = sharedMem
+        self.text_send = text_send
         self.start()
         self.process = None
 
     def run(self):
 
+        print "files path is &&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&"
+        file_path = self.sharedMem["file_path"]
+        print file_path 
+        print "files path is &&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&"
+        print file_path
+
         if self.mode == 1:
             s = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
             s.connect(('localhost', self.dst_port))
-            file_f = open("kali_linux.jpg", "rb")
+            paddedFile_path = file_path.ljust(1024)
+            print "len padded file path ", paddedFile_path
+            s.send(paddedFile_path)
+            file_f = open(file_path, "rb")
             block = file_f.read(1024)
-            filesize = int(os.stat(self.filename).st_size)
+            filesize = int(os.stat(file_path).st_size)
             blockCounter = len(block)
             while (block):
                 calc = (float(blockCounter)/float(filesize))*float(100)
@@ -484,6 +531,7 @@ class P2P_SEND(Thread):
             print "file sent"
             file_f.close()
             print "AES FILETRANSFER COMPLETE"
+            wx.CallAfter(self.text_send.AppendText, "\n" + t() + "AES FILETRANSFER COMPLETE" + "\n")
             s.close()
 
 
@@ -494,9 +542,14 @@ class P2P_SEND(Thread):
             FSPUBLIC = s.recv(243)
             print "recieved public_key from FileServerClient"
             print FSPUBLIC
+
+            paddedFile_path = file_path.ljust(1024)
+            print "len padded file path ", paddedFile_path
+            s.send(paddedFile_path)
+
             #get the total size of file in bytes
-            filesize = int(os.stat(self.filename).st_size)
-            file_f = open("kali_linux.jpg", "rb")
+            filesize = int(os.stat(file_path).st_size)
+            file_f = open(file_path, "rb")
             block = file_f.read(1024)
             blockCounter = len(block)
             while (block):
@@ -511,6 +564,8 @@ class P2P_SEND(Thread):
             s.close()
             # s.send(self.data)
             print "RSA FILETRANSFER COMPLETE"
+            wx.CallAfter(self.text_send.AppendText, "\n" + t() + "RSA FILETRANSFER COMPLETE" + "\n")
+
 
 	def stop(self):
 		print "Trying to stop thread "
