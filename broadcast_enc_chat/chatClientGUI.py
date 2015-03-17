@@ -62,6 +62,7 @@ class ChatRoomFrame(wx.Frame):
         self.filetxID_Final = "2D56DE9597CFF43DD5C1335D509517C9"
         self.init_File_Server_mode = False
         self.Shared_Mem_Dictionary["p2p_dest"]= 0
+        self.Shared_Mem_Dictionary["choices"] = None
         #THE InterProcess Thread - The Main READING THREAD for the chat Client
         #Messages are passed through here
         #Checks for "Custom Commands" are also performed
@@ -70,7 +71,7 @@ class ChatRoomFrame(wx.Frame):
         #to stop of possible simulatnous access issues
         #and saves having to set it up again
         newAes = copy.copy(self.client.a)
-        self.IPC = IPC_Read(self.client, self.text_send , self.ctrl, self, newAes)
+        self.IPC = IPC_Read(self.client, self.text_send , self.ctrl, self, newAes, self.Shared_Mem_Dictionary)
         #create a new READING THREAD with a NEW SOSCKET to bind to
        	self.newSocketRead = None#P2P_READ()
 
@@ -394,7 +395,7 @@ class chooseFilePanel(wx.Frame):
 
 class IPC_Read(Thread):
     """Main Socket Reading Thread for the client"""
-    def __init__(self, client, text_send, ctrl, caller, aes):
+    def __init__(self, client, text_send, ctrl, caller, aes, sharedMem):
         """Initialize"""
         Thread.__init__(self)
         self.client = client
@@ -402,6 +403,7 @@ class IPC_Read(Thread):
         self.text_send = text_send
         self.ctrl = ctrl
         self.aes = aes
+        self.sharedMem = sharedMem
         self.start()
 
     def run(self):
@@ -417,6 +419,7 @@ class IPC_Read(Thread):
 
             remoteConnectedClients = packet["remoteConnectedClients"]
             if not remoteConnectedClients == None:
+                self.sharedMem["choices"] = remoteConnectedClients
                 print ">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>"
                 print "listing of Client", remoteConnectedClients 
                 print "<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<"
