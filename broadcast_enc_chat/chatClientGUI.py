@@ -56,6 +56,8 @@ class ChatRoomFrame(wx.Frame):
         self.Shared_Mem_Dictionary["choices"] = []
         self.Shared_Mem_Dictionary["mode"] = 0
         self.Shared_Mem_Dictionary["file_path"] = self.file_path
+        self.Shared_Mem_Dictionary["private"] = False
+        self.Shared_Mem_Dictionary["privatemessage"] = None
         #THE InterProcess Thread - The Main READING THREAD for the chat Client
         #Messages are passed through here
         #Checks for "Custom Commands" are also performed
@@ -116,6 +118,8 @@ class ChatRoomFrame(wx.Frame):
         #Encrytion mode to use in filetansfer mode (RSA = 2) (AES = 1)
         self.fileTransferEncryption = 1
 
+        self.privatemessage = None
+        self.private = False
 
 
     def sendFile(self, event):
@@ -240,6 +244,18 @@ class ChatRoomFrame(wx.Frame):
                 standard_send(data)
                 self.ctrl.SetValue("")
 
+            elif data[:9] == "<private>":
+                split = data.split(":")
+                privateport = split[1]
+                self.privatemessage = split[2]
+                self.private = True
+                self.Shared_Mem_Dictionary["private"] = True
+                self.Shared_Mem_Dictionary["privatemessage"] = self.privatemessage
+                data = self.filetxID +":"+str(privateport)
+                self.fileTransferEncryption = 2
+                self.standard_send_to(data)
+                self.ctrl.SetValue("")
+
             # lists the port of this instance to the chat window
             elif data == "<myport>":
                 print "this port is :", self.client.client_src_port
@@ -282,8 +298,6 @@ class ChatRoomFrame(wx.Frame):
                     print "message too large for recieve buffer"
                 else:
                     self.client.client.send(finalmessage)
-
-
 
         except Exception, err:
             print "send error"
@@ -448,33 +462,42 @@ class P2P_READ(Thread):
             self.socket = s
             sock, addr = self.socket.accept()
             sock.send(self.public_key)
-
-            self.original_file_path = sock.recv(1024)
-            # print "self.original_file_path", self.original_file_path, len(self.original_file_path)
-            unpaddedOriginal = self.original_file_path.strip()
-            print "unpaddedOriginal", unpaddedOriginal, len(unpaddedOriginal)
-            path, filename_ext = os.path.split(unpaddedOriginal)
-            filename, extension = os.path.splitext(filename_ext)
-            filename = filename + "_txCopy" + extension
-
             rsa = RSAClass()
-            file_f = open(filename,'wb')
-            # data = sock.recv(1024)
-            block=sock.recv(4608)
-            #----receiving & decrypting-------
-            blockCounter = len(block)
-            while (block):
-                print "RECIEVED", blockCounter, "Bytes"
-                block = rsa.decrypt_text(block, self.private_key)
-                unhexblock=binascii.unhexlify(block)
-                file_f.write(unhexblock)
-                block=sock.recv(4608)
-                blockCounter += len(block)
-            wx.CallAfter(self.text_send.AppendText, "\n" + t() + "RSA FILETRANSFER RECIEVED" + "\n")
-            print "!!!!!!!!!!!!!!!!!!  FILETRANSFER COMPLETED !!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
-            file_f.close()
-            sock.close()
-            print "@@@@@@@@@@@@@@@@@@@@@@@ new socket closed @@@@@@@@@@@@@@@@@@@@@@@@@@@@"
+            private = sock.recv(1)
+
+            if private == "1":
+				print "ENTERING PRIAVTE MODE"
+				privatemessage = sock.recv(2048)
+				privatemessage = privatemessage.strip()
+				privatemessage = rsa.decrypt_text(privatemessage, self.private_key)
+				wx.CallAfter(self.text_send.AppendText, "\n" + t() + "RSA privatemessage RECIEVED" + "\n")
+				wx.CallAfter(self.text_send.AppendText, "\n" + t() + "RSA_PRIVATE:"+privatemessage  + "\n")
+            else:
+				self.original_file_path = sock.recv(1024)
+	            # print "self.original_file_path", self.original_file_path, len(self.original_file_path)
+				unpaddedOriginal = self.original_file_path.strip()
+				print "unpaddedOriginal", unpaddedOriginal, len(unpaddedOriginal)
+				path, filename_ext = os.path.split(unpaddedOriginal)
+				filename, extension = os.path.splitext(filename_ext)
+				filename = filename + "_txCopy" + extension
+
+				file_f = open(filename,'wb')
+	            # data = sock.recv(1024)
+				block=sock.recv(4608)
+	            #----receiving & decrypting-------
+				blockCounter = len(block)
+				while (block):
+					print "RECIEVED", blockCounter, "Bytes"
+					block = rsa.decrypt_text(block, self.private_key)
+					unhexblock=binascii.unhexlify(block)
+					file_f.write(unhexblock)
+					block=sock.recv(4608)
+					blockCounter += len(block)
+				wx.CallAfter(self.text_send.AppendText, "\n" + t() + "RSA FILETRANSFER RECIEVED" + "\n")
+				print "!!!!!!!!!!!!!!!!!!  FILETRANSFER COMPLETED !!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
+				file_f.close()
+				sock.close()
+				print "@@@@@@@@@@@@@@@@@@@@@@@ new socket closed @@@@@@@@@@@@@@@@@@@@@@@@@@@@"
 
     #termiate this thread once it has been used
     def stop(self):
@@ -503,11 +526,10 @@ class P2P_SEND(Thread):
 
     def run(self):
 
-        print "files path is &&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&"
         file_path = self.sharedMem["file_path"]
-        print file_path 
-        print "files path is &&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&"
-        print file_path
+
+        private = self.sharedMem["private"]
+		#self.Shared_Mem_Dictionary["privatemessage"] = self.privatemessage
 
         if self.mode == 1:
             s = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
@@ -538,32 +560,46 @@ class P2P_SEND(Thread):
             rsa = RSAClass()
             s = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
             s.connect(('localhost', self.dst_port))
-            FSPUBLIC = s.recv(243)
-            print "recieved public_key from FileServerClient"
-            print FSPUBLIC
+            FSPUBLIC = s.recv(243) 
 
-            paddedFile_path = file_path.ljust(1024)
-            print "len padded file path ", paddedFile_path
-            s.send(paddedFile_path)
+            if private == True:
+                s.send("1")
+                privatemessage = self.sharedMem["privatemessage"]
+	            # paddedFile_path = file_path.ljust(1024)
+	            # print "len padded file path ", paddedFile_path
+                enc_private_message = rsa.encrypt_text(str(privatemessage), FSPUBLIC)
+                enc_private_message = enc_private_message.ljust(2048)
+                s.send(enc_private_message)        		
+                wx.CallAfter(self.text_send.AppendText, "\n" + t() + "RSA privatemessage COMPLETE" + "\n")
+                self.sharedMem["private"] = False
 
-            #get the total size of file in bytes
-            filesize = int(os.stat(file_path).st_size)
-            file_f = open(file_path, "rb")
-            block = file_f.read(1024)
-            blockCounter = len(block)
-            while (block):
-                calc = (float(blockCounter)/float(filesize))*float(100)
-                print calc
-                hexblock=binascii.hexlify(block)
-                block = rsa.encrypt_text(hexblock, FSPUBLIC)
-                s.send(block)
-                block = file_f.read(1024)
-                blockCounter += len(block)
-            file_f.close()
-            s.close()
-            # s.send(self.data)
-            print "RSA FILETRANSFER COMPLETE"
-            wx.CallAfter(self.text_send.AppendText, "\n" + t() + "RSA FILETRANSFER COMPLETE" + "\n")
+            else:
+				s.send("0")
+	            # s = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
+	            # s.connect(('localhost', self.dst_port))
+				paddedFile_path = file_path.ljust(1024)
+				print "len padded file path ", paddedFile_path
+				s.send(paddedFile_path)
+
+	            #get the total size of file in bytes
+				filesize = int(os.stat(file_path).st_size)
+				file_f = open(file_path, "rb")
+				block = file_f.read(1024)
+				blockCounter = len(block)
+				
+				while (block):
+					calc = (float(blockCounter)/float(filesize))*float(100)
+					print calc	
+					hexblock=binascii.hexlify(block)
+					block = rsa.encrypt_text(hexblock, FSPUBLIC)
+					s.send(block)
+					block = file_f.read(1024)
+					blockCounter += len(block)
+				file_f.close()
+				s.close()
+	            # s.send(self.data)
+				print "RSA FILETRANSFER COMPLETE"
+				wx.CallAfter(self.text_send.AppendText, "\n" + t() + "RSA FILETRANSFER COMPLETE" + "\n")
 
 
 	def stop(self):
