@@ -372,6 +372,7 @@ class IPC_Read(Thread):
             	self.caller.fileTransferEncryption = 1
             #decypt the data
             data = self.client.a.dec_str(data)
+            print "Decrypting:", data
             #Check for COMMAND to start this instance as a SERVER
             #if command exists take Source port and pass it and create the
             #P2P_SEND thread, which will bind to a new socket and
@@ -382,11 +383,10 @@ class IPC_Read(Thread):
                 print 'dst_p2p_port', src_port
                 self.caller.bind_to_new(int(src_port))
                 print "value change shared Shared_Mem_Dictionary"
-            print "Decrypting:", data
             #if the message has the SERVER SETUP COMPLETE SO SEND COMMAND
             #this will initate a P2P new sending THREAD that will start the file transfer
-            if (len(data) > 32) and data[:32] == self.caller.filetxID_Final:
-            	newFileServerSocketAddress = int(data[33:])
+            elif (len(data) > 32) and data[:32] == self.caller.filetxID_Final:
+                newFileServerSocketAddress = int(data[33:])
             	print "Got the new Server Socket - Returned From Server"
             	print newFileServerSocketAddress
             	d2 = "filetx from second Thread - Client!!!!!!!!!!!!!!!!!!!!!!!!!"
@@ -397,7 +397,8 @@ class IPC_Read(Thread):
             # (stange that it only crashes in osx - windows and linux were unaffected)
             # CallAfter or CallLater is used to schedule a function to be called on the main UI thread
             # (with the actual UI-changing code inside that function
-            wx.CallAfter(self.text_send.AppendText, "\n" + t() + data + "\n")
+            elif not data[:32]== "6DCC655077693A5E1ED5857314A0F96D" and not data ==  "<list>":
+            	wx.CallAfter(self.text_send.AppendText, "\n" + t() + data + "\n")
             # self.text_send.AppendText("\n" + t() + data + "\n")
 
 
@@ -470,7 +471,7 @@ class P2P_READ(Thread):
 				privatemessage = sock.recv(2048)
 				privatemessage = privatemessage.strip()
 				privatemessage = rsa.decrypt_text(privatemessage, self.private_key)
-				wx.CallAfter(self.text_send.AppendText, "\n" + t() + "RSA privatemessage RECIEVED" + "\n")
+				#wx.CallAfter(self.text_send.AppendText, "\n" + t() + "RSA privatemessage RECIEVED" + "\n")
 				wx.CallAfter(self.text_send.AppendText, "\n" + t() + "RSA_PRIVATE:"+privatemessage  + "\n")
             else:
 				self.original_file_path = sock.recv(1024)

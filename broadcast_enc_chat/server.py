@@ -105,7 +105,7 @@ class RemoteClient(asyncore.dispatcher):
 
 class Chatroom(asyncore.dispatcher):
         #asyncore dispatcher listening on localhost random socket
-    def __init__(self, address=('localhost', 0)):
+    def __init__(self, address=('localhost', 31337)):
         asyncore.dispatcher.__init__(self)
 
         # self.set_reuse_addr()
