@@ -280,7 +280,7 @@ class ChatRoomFrame(wx.Frame):
             # code for a standard message send
             else:
                 #append the message to chatwindows with timestamp
-                self.text_send.AppendText("\n" + t() + data + "\n")
+                self.text_send.AppendText("\n" + t() +"<You> " + data + "\n")
                 #clear the submit box
                 self.ctrl.SetValue("")
                 #encypt the data
@@ -398,7 +398,7 @@ class IPC_Read(Thread):
             # CallAfter or CallLater is used to schedule a function to be called on the main UI thread
             # (with the actual UI-changing code inside that function
             elif not data[:32]== "6DCC655077693A5E1ED5857314A0F96D" and not data ==  "<list>":
-            	wx.CallAfter(self.text_send.AppendText, "\n" + t() + data + "\n")
+            	wx.CallAfter(self.text_send.AppendText, "\n" + t()+"<" +str(src_port)+"> " + data + "\n")
             # self.text_send.AppendText("\n" + t() + data + "\n")
 
 
