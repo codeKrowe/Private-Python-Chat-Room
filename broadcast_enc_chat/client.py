@@ -9,9 +9,11 @@ from AES_Class import *
 from RSAClass import *
 import random
 
+# version 2.0
+
 # Hard Coded port for testing
 # MUST BE CHANGED TO WHATEVER PORT SERVER SETS
-PORT =    59805
+PORT=50319
 HOST = 'localhost'
 BUFSIZE = 1024
 ADDR = (HOST, PORT)
@@ -20,26 +22,28 @@ class Client:
     """Class for a user of the chat client."""
     def __init__(self):
         self.rsa = RSAClass()
+        #generate the Public Private key pair for this client
         self.public_key, self.private_key = self.rsa.generate_keys()
 
+        # read in the Public key of the Server from XML File
         self.pubKey = chilkat.CkPublicKey()
         self.pubKey.LoadXmlFile("Serverpublickey.xml")
         self.ServerPublicKey = self.pubKey.getXml()
 
+        #objects for hashing and diffie hellman
         self.md5_crypt = chilkat.CkCrypt2()
         self.hashcrypt = chilkat.CkCrypt2()
         self.dhAlice = chilkat.CkDh()
-
-        # Unlock components above
-        self.UnlockComponents()
-
         self.md5_crypt.put_EncodingMode("hex")
         #  Set the hash algorithm:
         self.md5_crypt.put_HashAlgorithm("md5")
 
         self.hashcrypt.put_EncodingMode("hex")
         self.hashcrypt.put_HashAlgorithm("md5")
+        # Unlock components above
+        self.UnlockComponents()
 
+        #create a oscket and connect to the server
         self.client = socket(AF_INET, SOCK_STREAM)
         self.client.connect(ADDR)
 
@@ -51,17 +55,17 @@ class Client:
 
 
     def UnlockComponents(self):
-        success = self.md5_crypt.UnlockComponent("30-day trial")
+        success = self.md5_crypt.UnlockComponent("T12302015Crypt_sHyDCAFgIR1v")
         if (success != True):
             print(self.md4_crypt.lastErrorText())
             sys.exit()
 
-        success = self.hashcrypt.UnlockComponent("Anything for 30-day trial.")
+        success = self.hashcrypt.UnlockComponent("T12302015Crypt_sHyDCAFgIR1v")
         if (success != True):
             print(self.hashcrypt.lastErrorText())
             sys.exit()
 
-        success = self.dhAlice.UnlockComponent("Anything for 30-day trial")
+        success = self.dhAlice.UnlockComponent("T12302015Diffie_eegQ20BTIR5q")
         if (success != True):
             print(self.dhAlice.lastErrorText())
             sys.exit()
@@ -145,6 +149,8 @@ class Client:
                 print "serverSessionKey", sk
                 print "setting serverSessionKey"
                 self.a.set_sessionkey(sk)
+                iv = self.a.getCrypt().hashStringENC(sk)
+                self.a.setIv(iv)
             else:
                 print "Integrity Mismatch"
                 client.close()

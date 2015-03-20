@@ -3,6 +3,7 @@ import sys
 import chilkat
 import os, binascii
 
+#AES Class using the Chilkat Library to setup Asynchronous Encryption
 class AESClass:
 	def __init__(self, mode,keylen,padding,enc_mode):
 		self.mode = mode
@@ -19,6 +20,7 @@ class AESClass:
 		self.zip = chilkat.CkZip()
 		self.UnlockComponents()
 
+	#redundant and not used - remove
 	def getCrypt(self):
 		return self.crypt
 
@@ -33,6 +35,8 @@ class AESClass:
 		    print(self.zip.lastErrorText())
 		    sys.exit()
 
+    #setup AES with mode, key size and padding, set an IV which will get overwritten by clients
+    # when the generate the same iv
 	def setupAES(self):
 		self.crypt.put_CryptAlgorithm("aes")
 		self.crypt.put_CipherMode(self.mode)
@@ -55,6 +59,7 @@ class AESClass:
 		self.crypt.SetEncodedKey(self.keyHex,"hex")
 		self.setup = True
 
+	#Methods to encrypt and decrypt and (access and mutator methods)
 	def enc_str(self, val):
 		encStr = self.crypt.encryptStringENC(val)
 		return encStr
@@ -84,6 +89,7 @@ class AESClass:
 			print(self.crypt.lastErrorText())
 			sys.exit()
 
+	#compress and file
 	def compress_zip(self, filename, zip_name):
 		success = self.zip.NewZip(zip_name)
 		if (success != True):
@@ -147,5 +153,5 @@ class AESClass:
 			return self.ivHex
 
 	def setIv(self, iv):
-		ivHex = iv
+		self.ivHex = iv
 		return True
