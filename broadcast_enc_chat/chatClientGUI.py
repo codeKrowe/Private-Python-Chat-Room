@@ -39,7 +39,7 @@ class ChatRoomFrame(wx.Frame):
         #default file path
         self.file_path = "kali_linux.jpg"
         #set up a client instance 
-        #it will go though the protocol setup with the srver
+        #it will go though the protocol setup with the server
         self.client = Client()
         self.client.setUpClient()
 
@@ -47,7 +47,7 @@ class ChatRoomFrame(wx.Frame):
         self.manager = Manager()
         self.Shared_Mem_Dictionary = self.manager.dict()
 
-        #creat uniuqe Command code that the system can recognise and initiate actions based on
+        #create unique Command code that the system can recognize and initiate actions based on
         #such as file transmission and first handshake stage completion
         self.filetxID = "6DCC655077693A5E1ED5857314A0F96D"
         self.filetxID_Final = "2D56DE9597CFF43DD5C1335D509517C9"
@@ -75,7 +75,7 @@ class ChatRoomFrame(wx.Frame):
         self.sendFile_Btn = wx.Button(self, 1, 'Send File')
 
         #Also make a shallow copy of the AES Object
-        #to stop of possible simulatnous access issues
+        #to stop of possible simultaneous access issues
         #and saves having to set it up again
         newAes = copy.copy(self.client.a)
         self.IPC = IPC_Read(self.client, self.text_send , self.ctrl, self, newAes, self.Shared_Mem_Dictionary)
@@ -107,11 +107,11 @@ class ChatRoomFrame(wx.Frame):
         btn.Bind(wx.EVT_BUTTON, self.onSet)
 
 
-        #FLAG for LISTING connected Cleints from the server and have the server
-        #build this list and retunr it to "this" cleint instance
+        #FLAG for LISTING connected Clients from the server and have the server
+        #build this list and return it to "this" client instance
         self.l = False
         self.fileServerMode = False
-        #Encrytion mode to use in filetansfer mode (RSA = 2) (AES = 1)
+        #Encryption mode to use in Transfer mode (RSA = 2) (AES = 1)
         self.fileTransferEncryption = 1
         # Private message flag
         self.privatemessage = None
@@ -121,7 +121,7 @@ class ChatRoomFrame(wx.Frame):
     # starts a file transmission from GUI
     def sendFile(self, event):
         """ Send File to Client """
-        #get the filepath
+        #get the file-path
         file_path = self.choose_file.GetPath()
         #set the file path
         self.file_path = file_path
@@ -137,12 +137,12 @@ class ChatRoomFrame(wx.Frame):
              self.text_send.AppendText("\n" + t() + ":Try Again " + "\n")                      
 
         else:
-            #create a filetransfer COMMAND with the destination port concatentated
+            #create a file-transfer COMMAND with the destination port concatenated
             file_transmisson_cmd = self.filetxID + ":" + str(port)
             self.text_send.AppendText("\n" + t() + ":Filetrasfer Started " + "\n")
             self.ctrl.SetValue("")
             #send the message to the server
-            #there is weakness here because this message is sent to all clients but this istance
+            #there is weakness here because this message is sent to all clients but this instance
             self.standard_send_to(file_transmisson_cmd)
             
     def onSet(self,event):
@@ -156,14 +156,14 @@ class ChatRoomFrame(wx.Frame):
             self.standard_send_to(dat)
             self.fileTransferEncryption = 1
 
-    #When recieve the filetransfer command starts this method
+    #When receive the file transfer command starts this method
     #It creates a new thread, binds to a new port and returns this to the client
     #that initiated the command
     def bind_to_new(self, p2p_port):
         #shallow copy of AES object
         newaes = copy.copy(self.client.a)
     	try:
-            #start the Peer to Peer Read filetrasnfer thread,
+            #start the Peer to Peer Read file transfer thread,
             #bind to new socket and wait for connection from initiating client
         	self.newSocketRead = P2P_READ(self.fileTransferEncryption, self.client.public_key, self.client.private_key, newaes, self.text_send)
         except Exception, err:
@@ -175,7 +175,7 @@ class ChatRoomFrame(wx.Frame):
         print "************New Socket Binding************"
         print self.newSocketRead.get_address()[1]
         #Attach COMMAND CODE for FILETRANSFER SERVER setup complete
-        #gets the client to start a FILETX send Thread when it recieves this
+        #gets the client to start a FILETX send Thread when it receives this
         #message ( also attached the new port to the message so the client can use the
         #address)
         data = "2D56DE9597CFF43DD5C1335D509517C9:" + str(self.newSocketRead.get_address()[1])
@@ -196,15 +196,15 @@ class ChatRoomFrame(wx.Frame):
             self.client.client.send(finalmessage)
         self.init_File_Server_mode == False
 
-    '''standard send code used by specific funtions'''
+    '''standard send code used by specific functions'''
     def standard_send_to(self, data):
-        #encypt the data
+        #encrypt the data
         data = self.client.a.enc_str(str(data))
         #package flags and data
         dictobj = {'src_port' : self.client.client_src_port, 'data' : data, "list": self.l, "tx": False\
         ,"p2p_port":0, "newSock": 0, "FTX_ENC" :self.fileTransferEncryption}
         pickdump = pickle.dumps(dictobj)
-        #concatente serialized message with hash
+        #concatenate serialized message with hash
         hashStr = self.client.md5_crypt.hashStringENC(pickdump)
         finalmessage = pickdump + hashStr
         if len(finalmessage) > 1024:
@@ -219,7 +219,7 @@ class ChatRoomFrame(wx.Frame):
             dictobj = {'src_port' : self.client.client_src_port, 'data' : data, "list": self.l, "tx": False\
             ,"p2p_port":0, "newSock": 0, "FTX_ENC" :self.fileTransferEncryption}
             pickdump = pickle.dumps(dictobj)
-            # concatente serialized message with hash
+            # concatenate serialized message with hash
             hashStr = self.client.md5_crypt.hashStringENC(pickdump)
             finalmessage = pickdump + hashStr
             if len(finalmessage) > 1024:
@@ -255,7 +255,7 @@ class ChatRoomFrame(wx.Frame):
                 standard_send(data)
                 self.ctrl.SetValue("")
 
-            #private mode, break the commands into components when encoutering ":"
+            #private mode, break the commands into components when encountering ":"
             elif data[:9] == "<private>":
                 split = data.split(":")
                 #port destination
@@ -267,7 +267,7 @@ class ChatRoomFrame(wx.Frame):
                 #also store in shared memory
                 self.Shared_Mem_Dictionary["private"] = True
                 self.Shared_Mem_Dictionary["privatemessage"] = self.privatemessage
-                #attach a Filetransfer ID to start the handshake
+                #attach a File-transfer ID to start the handshake
                 data = self.filetxID +":"+str(privateport)
                 #Set mode the RSA for Private message send
                 self.fileTransferEncryption = 2
@@ -280,7 +280,7 @@ class ChatRoomFrame(wx.Frame):
                 self.text_send.AppendText("\n" + t() + "this port is :" + str(self.client.client_src_port) + "\n")
                 self.ctrl.SetValue("")
 
-            #changes the filetransfer encyption mode globally
+            #changes the file-transfer encryption mode globally
             elif data == "<rsa>":
             	self.text_send.AppendText("\n" + t() + "Entering RSA MODE" + "\n")
             	self.fileTransferEncryption = 2
@@ -296,18 +296,18 @@ class ChatRoomFrame(wx.Frame):
 
             # code for a standard message send
             else:
-                #append the message to chatwindows with timestamp
+                #append the message to chat windows with timestamps
                 self.text_send.AppendText("\n" + t() +"<You> " + data + "\n")
                 #clear the submit box
                 self.ctrl.SetValue("")
-                #encypt the data
+                #encrypt the data
                 data = self.client.a.enc_str(str(data))
                 # create the packet
                 dictobj = {'src_port' : self.client.client_src_port, 'data' : data, "list": self.l, "tx":False , "p2p_port":0\
                 ,"newSock": 0, "FTX_ENC" :self.fileTransferEncryption}
-                #serialise it
+                #serialize it
                 pickdump = pickle.dumps(dictobj)
-                # concatente serialized message with hash
+                # concatenate serialized message with hash
                 hashStr = self.client.md5_crypt.hashStringENC(pickdump)
                 #make the final message
                 finalmessage = pickdump + hashStr
@@ -350,10 +350,10 @@ class MainFrame(wx.Frame):
         wx.Frame.__init__(self, None, -1, "Chat Client")
         panel = MainPanel(self)
 
-# MAIN Thead for reading messages from the server 
+# MAIN Thread for reading messages from the server 
 # This accepts messages on the client objects behalf
 # passing them back to the main thread to the CHat window
-# messages are chechked here for commands that itiate the Filetransfer modes and Private
+# messages are checked here for commands that initiate the File transfer modes and Private
 # Also commands to change RSA and AES
 class IPC_Read(Thread):
     """Main Socket Reading Thread for the client"""
@@ -370,17 +370,17 @@ class IPC_Read(Thread):
 
     def run(self):
         while True:
-            #recieve data
+            #receive data
             data = self.client.client.recv(1024)
             if not data: sys.exit(0)
-            #deserialise the data
+            #serialize the data
             packet = pickle.loads(data)
             data = packet["data"]
             #get the source port of the "packet"
             src_port = packet["src_port"]
 
-            #STORE an Assosiatve (list) array of connected cleints
-            #we didnt end up using this
+            #STORE an Associative (list) array of connected clients
+            #we didn't end up using this
             #only the string connection list was used
             remoteConnectedClients = packet["remoteConnectedClients"]
             if not remoteConnectedClients == None:
@@ -391,20 +391,20 @@ class IPC_Read(Thread):
             print "MODE IS CURRENTLY", self.caller.fileTransferEncryption
 
 
-            #set the Filetrasfer mode depending on the Flag
-            # done witn passed in object (not a great way)
+            #set the File transfer mode depending on the Flag
+            # done with passed in object (not a great way)
             if packet["FTX_ENC"] == 2:
             	self.caller.fileTransferEncryption = 2
             elif packet["FTX_ENC"] == 1:
             	self.caller.fileTransferEncryption = 1
 
-            #decypt the data
+            #decrypt the data
             data = self.client.a.dec_str(data)
             print "Decrypting:", data
             #Check for COMMAND to start this instance as a SERVER
             #if command exists take Source port and pass it and create the
             #P2P_SEND thread, which will bind to a new socket and
-            #send the new PORT back to the client that iniated the request
+            #send the new PORT back to the client that initiated the request
             if (len(data) > 32) and data[:32] == self.caller.filetxID and int(data[33:]) == int(self.client.client_src_port):
                 self.caller.init_File_Server_mode = True
                 # dst_p2p_port = data[33:]
@@ -412,17 +412,17 @@ class IPC_Read(Thread):
                 self.caller.bind_to_new(int(src_port))
                 print "value change shared Shared_Mem_Dictionary"
             #if the message has the SERVER SETUP COMPLETE SO SEND COMMAND (filetxID_Final)
-            #this will initate a P2P new sending THREAD that will start the file transfer
+            #this will initiate a P2P new sending THREAD that will start the file transfer
             elif (len(data) > 32) and data[:32] == self.caller.filetxID_Final:
                 newFileServerSocketAddress = int(data[33:])
             	print "Got the new Server Socket - Returned From Server"
             	print newFileServerSocketAddress
             	d2 = "filetx from second Thread - Client!!!!!!!!!!!!!!!!!!!!!!!!!"
             	p2p_send = P2P_SEND(newFileServerSocketAddress, d2, self.caller.fileTransferEncryption , self.aes, self.sharedMem, self.text_send)
-            #append recieved messages to the GUI chat window
+            #append received messages to the GUI chat window
             # using wx Callafter to limit the errors introduced in OSX
-            # caused by accessing the same object in multiplethreads
-            # (stange that it only crashes in osx - windows and linux were unaffected)
+            # caused by accessing the same object in multiple threads
+            # (strange that it only crashes in osx - windows and Linux were unaffected)
             # CallAfter or CallLater is used to schedule a function to be called on the main UI thread
             # (with the actual UI-changing code inside that function
             elif not data[:32]== "6DCC655077693A5E1ED5857314A0F96D" and not data ==  "<list>":
@@ -431,7 +431,7 @@ class IPC_Read(Thread):
 
 
 """PEER TO PEER Read Thread
-Binds to new Socket, waits for client to connect once it recieves the new port address
+Binds to new Socket, waits for client to connect once it receives the new port address
 (a called funtion send this port back to the initiating client |get_address()|)"""
 class P2P_READ(Thread):
     def __init__(self, mode, public_key, private_key, aes,text_send):
@@ -456,6 +456,15 @@ class P2P_READ(Thread):
         newSocketAddress = s.getsockname()
         self.newReadSocketAddress = newSocketAddress
 
+        import math
+        suffixes = ['B', 'KB', 'MB', 'GB', 'TB', 'PB']
+        def human_size(nbytes):
+            rank = int((math.log10(nbytes)) / 3)
+            rank = min(rank, len(suffixes) - 1)
+            human = nbytes / (1024.0 ** rank)
+            f = ('%.2f' % human).rstrip('0').rstrip('.')
+            return '%s %s' % (f, suffixes[rank])
+
         # if the mode is AES
         if self.mode == 1:
             #Wait to accept one client
@@ -464,7 +473,7 @@ class P2P_READ(Thread):
             self.socket = s
             # accept the client as a new socket sock
             sock, addr = self.socket.accept()
-            #recieve the orignal file path, padded with white space t0 1024 characters
+            #receive the original file path, padded with white space t0 1024 characters
             self.original_file_path = sock.recv(1024)
             #strip the whitespace padding 
             unpaddedOriginal = self.original_file_path.strip()
@@ -479,7 +488,7 @@ class P2P_READ(Thread):
             block = sock.recv(2752)
             blockCounter = len(block)
             while (block):
-                    print "RECIEVED", blockCounter, "Bytes"
+                    print "RECIEVED", human_size(blockCounter)
                     block=self.aes.dec_str(block)
                     unhexblock=binascii.unhexlify(block)
                     file_f.write(unhexblock)
@@ -498,18 +507,18 @@ class P2P_READ(Thread):
             print "@@@@@@@@@@@@@@@@@@@@@@@@-SECOND SOCKET CREATED RSA-@@@@@@@@@@@@@@@@@@@@@@"
             self.socket = s
             sock, addr = self.socket.accept()
-            #Send This clients Public key to the calling cleint
+            #Send This clients Public key to the calling client
             sock.send(self.public_key)
             rsa = RSAClass()
 
-            #recieve if this is private message mode
+            #receive if this is private message mode
             private = sock.recv(1)
             if private == "1":
 				print "ENTERING PRIAVTE MODE"
 				privatemessage = sock.recv(2048)
 				privatemessage = privatemessage.strip()
 				privatemessage = rsa.decrypt_text(privatemessage, self.private_key)
-                #append the private recieved message to the chat window
+                #append the private received message to the chat window
 				wx.CallAfter(self.text_send.AppendText, "\n" + t() + "RSA_PRIVATE:"+privatemessage  + "\n")
             else:
 				self.original_file_path = sock.recv(1024)
@@ -525,7 +534,7 @@ class P2P_READ(Thread):
 	            #----receiving & decrypting-------
 				blockCounter = len(block)
 				while (block):
-					print "RECIEVED ", blockCounter, "Bytes "
+					print "RECIEVED ", human_size(blockCounter)
 					block = rsa.decrypt_text(block, self.private_key)
 					unhexblock=binascii.unhexlify(block)
 					file_f.write(unhexblock)
@@ -537,7 +546,7 @@ class P2P_READ(Thread):
 				sock.close()
 				print "@@@@@@@@@@@@@@@@@@@@@@@ new socket closed @@@@@@@@@@@@@@@@@@@@@@@@@@@@"
 
-    #termiate this thread once it has been used
+    #terminate this thread once it has been used
     def stop(self):
         print "Trying to stop thread "
         if self.process is not None:
@@ -548,7 +557,7 @@ class P2P_READ(Thread):
         return self.newReadSocketAddress
 
 
-# This is the thread the send the File or Private string message to the desination cleint
+# This is the thread the send the File or Private string message to the destination client
 class P2P_SEND(Thread):
     def __init__(self, dst_port, data, mode, aes, sharedMem, text_send):
         Thread.__init__(self)
@@ -579,7 +588,7 @@ class P2P_SEND(Thread):
             file_f = open(file_path, "rb")
             #block transfer
             block = file_f.read(1024)
-            #get filesize
+            #get file size
             filesize = int(os.stat(file_path).st_size)
             #count blocks
             blockCounter = len(block)
@@ -604,19 +613,19 @@ class P2P_SEND(Thread):
             wx.CallAfter(self.text_send.AppendText, "\n" + t() + "AES FILETRANSFER COMPLETE" + "\n")
             s.close()
 
-        #RSA MODE - same as aboove but with RSA and Private mode
+        #RSA MODE - same as above but with RSA and Private mode
         if self.mode == 2:
             rsa = RSAClass()
             s = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
             s.connect(('localhost', self.dst_port))
 
-            #recieve the public key for encryption
+            #receive the public key for encryption
             FSPUBLIC = s.recv(243) 
             #if private mode
             if private == True:
-                #send this flag to P2P Read Thrad of the target client
+                #send this flag to P2P Read Thread of the target client
                 s.send("1")
-                #private message extarct shared mem
+                #private message extract shared mem
                 privatemessage = self.sharedMem["privatemessage"]
                 enc_private_message = rsa.encrypt_text(str(privatemessage), FSPUBLIC)
                 enc_private_message = enc_private_message.ljust(2048)
