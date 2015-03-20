@@ -13,7 +13,7 @@ import random
 
 # Hard Coded port for testing
 # MUST BE CHANGED TO WHATEVER PORT SERVER SETS
-PORT=50272
+PORT=50319
 HOST = 'localhost'
 BUFSIZE = 1024
 ADDR = (HOST, PORT)
@@ -55,17 +55,17 @@ class Client:
 
 
     def UnlockComponents(self):
-        success = self.md5_crypt.UnlockComponent("30-day trial")
+        success = self.md5_crypt.UnlockComponent("T12302015Crypt_sHyDCAFgIR1v")
         if (success != True):
             print(self.md4_crypt.lastErrorText())
             sys.exit()
 
-        success = self.hashcrypt.UnlockComponent("Anything for 30-day trial.")
+        success = self.hashcrypt.UnlockComponent("T12302015Crypt_sHyDCAFgIR1v")
         if (success != True):
             print(self.hashcrypt.lastErrorText())
             sys.exit()
 
-        success = self.dhAlice.UnlockComponent("Anything for 30-day trial")
+        success = self.dhAlice.UnlockComponent("T12302015Diffie_eegQ20BTIR5q")
         if (success != True):
             print(self.dhAlice.lastErrorText())
             sys.exit()
