@@ -13,7 +13,7 @@ import random
 
 # Hard Coded port for testing
 # MUST BE CHANGED TO WHATEVER PORT SERVER SETS
-PORT=53585
+PORT=50272
 HOST = 'localhost'
 BUFSIZE = 1024
 ADDR = (HOST, PORT)

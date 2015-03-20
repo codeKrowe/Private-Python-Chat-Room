@@ -38,7 +38,7 @@ class ChatRoomFrame(wx.Frame):
         """Constructor"""
         #default file path
         self.file_path = "kali_linux.jpg"
-        #set up a client instance 
+        #set up a client instance
         #it will go though the protocol setup with the srver
         self.client = Client()
         self.client.setUpClient()
@@ -101,6 +101,7 @@ class ChatRoomFrame(wx.Frame):
         sizer.Add(self.port, 0, wx.EXPAND)
         sizer.Add(self.portText, 0, wx.EXPAND)
         sizer.Add(btn, 0, wx.EXPAND)
+
         self.SetSizer(sizer)
         self.ctrl.Bind(wx.EVT_TEXT_ENTER, self.onSend)
         self.sendFile_Btn.Bind(wx.EVT_BUTTON, self.sendFile)
@@ -129,12 +130,12 @@ class ChatRoomFrame(wx.Frame):
         self.Shared_Mem_Dictionary["file_path"] = str(file_path)
         #get the destination port
         port = self.portText.GetValue()
-        
+
         if str(port) == "" or port == None:
              self.text_send.AppendText("\n" + t() + ":Enter a Destination PORT! " + "\n")
         elif int(port) == self.client.client_src_port:
-             self.text_send.AppendText("\n" + t() + ":This is Your Port! " + "\n")  
-             self.text_send.AppendText("\n" + t() + ":Try Again " + "\n")                      
+             self.text_send.AppendText("\n" + t() + ":This is Your Port! " + "\n")
+             self.text_send.AppendText("\n" + t() + ":Try Again " + "\n")
 
         else:
             #create a filetransfer COMMAND with the destination port concatentated
@@ -144,7 +145,7 @@ class ChatRoomFrame(wx.Frame):
             #send the message to the server
             #there is weakness here because this message is sent to all clients but this istance
             self.standard_send_to(file_transmisson_cmd)
-            
+
     def onSet(self,event):
         #change transfer mode
         if self.rsa_radio.GetValue():
@@ -321,6 +322,46 @@ class ChatRoomFrame(wx.Frame):
             print traceback.format_exc()
             print sys.exc_info()[0]
 
+class SendTo(wx.Frame):
+    """ Choose who to send file to """
+
+    def __init__(self):
+        wx.Frame.__init__(self, None, -1, "Select Recipient", size=(250,150))
+        choose = wx.StaticText(self, label="Choose Recipient:")
+
+        # need to get list of connected clients?
+        clients = ['12345', '98765', '14785', '25896', '00000']
+
+        # add drop down list of connected clients
+        self.client_list = wx.ComboBox(self, -1, choices=clients, style=wx.CB_READONLY)
+        self.client_list.Centre()
+
+
+        btn = wx.Button(self, label="Next")
+        btn.Bind(wx.EVT_BUTTON, self.onNext)
+
+        # add box to enter destination port
+        # or do it behind the scenes
+
+        sizer = wx.BoxSizer(wx.VERTICAL)
+        flags = wx.ALL|wx.CENTER
+
+        sizer.Add(choose, 0, flags, 5)
+        sizer.Add(self.client_list, 0, flags, 5)
+        sizer.Add(btn, 0, flags, 5)
+        self.SetSizer(sizer)
+
+        self.Bind(wx.EVT_COMBOBOX, self.OnSelect)
+
+    def OnSelect(self, event):
+        # print selected
+        print self.client_list.GetValue()
+
+    def onNext(self, event):
+        """ Choose RSA or AES in next panel """
+        self.Hide()
+        choose_enc_type = FilePanel()
+        choose_enc_type.Show()
 
 
 class MainPanel(wx.Panel):
@@ -350,11 +391,6 @@ class MainFrame(wx.Frame):
         wx.Frame.__init__(self, None, -1, "Chat Client")
         panel = MainPanel(self)
 
-# MAIN Thead for reading messages from the server 
-# This accepts messages on the client objects behalf
-# passing them back to the main thread to the CHat window
-# messages are chechked here for commands that itiate the Filetransfer modes and Private
-# Also commands to change RSA and AES
 class IPC_Read(Thread):
     """Main Socket Reading Thread for the client"""
     def __init__(self, client, text_send, ctrl, caller, aes, sharedMem):
@@ -466,7 +502,7 @@ class P2P_READ(Thread):
             sock, addr = self.socket.accept()
             #recieve the orignal file path, padded with white space t0 1024 characters
             self.original_file_path = sock.recv(1024)
-            #strip the whitespace padding 
+            #strip the whitespace padding
             unpaddedOriginal = self.original_file_path.strip()
             print "unpaddedOriginal", unpaddedOriginal, len(unpaddedOriginal)
             #split the path and name, then rename with "_txCopy"
@@ -611,7 +647,7 @@ class P2P_SEND(Thread):
             s.connect(('localhost', self.dst_port))
 
             #recieve the public key for encryption
-            FSPUBLIC = s.recv(243) 
+            FSPUBLIC = s.recv(243)
             #if private mode
             if private == True:
                 #send this flag to P2P Read Thrad of the target client
@@ -620,11 +656,10 @@ class P2P_SEND(Thread):
                 privatemessage = self.sharedMem["privatemessage"]
                 enc_private_message = rsa.encrypt_text(str(privatemessage), FSPUBLIC)
                 enc_private_message = enc_private_message.ljust(2048)
-                s.send(enc_private_message)        		
+                s.send(enc_private_message)
                 wx.CallAfter(self.text_send.AppendText, "\n" + t() + "RSA privatemessage COMPLETE" + "\n")
                 #set private to off
                 self.sharedMem["private"] = False
-
             else:
 				s.send("0")
 				paddedFile_path = file_path.ljust(1024)
@@ -635,11 +670,11 @@ class P2P_SEND(Thread):
 				file_f = open(file_path, "rb")
 				block = file_f.read(1024)
 				blockCounter = len(block)
-				
+
                 #same as prior
 				while (block):
 					calc = (float(blockCounter)/float(filesize))*float(100)
-					print calc	
+					print calc
 					hexblock=binascii.hexlify(block)
 					block = rsa.encrypt_text(hexblock, FSPUBLIC)
 					s.send(block)
