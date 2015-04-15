@@ -9,5 +9,7 @@ All messages sent and received provide:
   
 File transfer and message transfer is possible through RSA or AES encryption.
 
-  
+2 clients connected to the chatroom.
+
+![](http://i.imgur.com/QrJSlvr.png)  
   
